@@ -1,0 +1,16 @@
+invoice_id,customer_id,country,branch_office,invoice_date,due_date,amount,currency,status
+INV-001,CUST-A,JPN,Tokyo HQ,2024-07-15,2024-08-14,5000000,JPY,outstanding
+INV-002,CUST-B,JPN,Osaka Office,2024-07-20,2024-08-19,20000000,JPY,outstanding
+INV-003,CUST-C,DEU,Berlin Office,2024-06-30,2024-07-30,25000,EUR,paid
+INV-004,CUST-A,USA,New York Office,2024-08-01,2024-08-31,75000,USD,outstanding
+INV-005,CUST-D,GBR,London Office,2024-08-05,2024-09-04,30000,GBP,outstanding
+INV-006,CUST-E,JPN,Tokyo HQ,2024-08-10,2024-09-09,1500000,JPY,outstanding
+INV-007,CUST-F,JPN,Nagoya Office,2024-07-25,2024-08-24,2200000,JPY,outstanding
+INV-008,CUST-G,JPN,Fukuoka Office,2024-08-12,2024-10-11,8000000,JPY,outstanding
+INV-009,CUST-H,DEU,Berlin Office,2024-08-15,2024-09-14,40000,CHF,outstanding
+INV-010,CUST-I,CHN,Shanghai Office,2024-06-20,2024-07-20,350000,CNY,paid
+INV-011,CUST-J,CHN,Shanghai Office,2024-08-20,2024-09-19,2500000,CNY,outstanding
+INV-012,CUST-K,USA,San Francisco Office,2024-08-02,2024-09-01,60000,USD,outstanding
+INV-013,CUST-L,DEU,Berlin Office,2024-08-08,2024-09-07,32000,EUR,outstanding
+INV-014,CUST-A,JPN,Tokyo HQ,2024-08-25,2024-09-24,6500000,JPY,outstanding
+INV-015,CUST-B,JPN,Osaka Office,2024-08-30,2024-09-29,35000000,JPY,outstanding

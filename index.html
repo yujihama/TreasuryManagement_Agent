@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>財務管理ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    .markdown-content ul { list-style-type: disc; margin-left: 1.5rem; }
+    .markdown-content ol { list-style-type: decimal; margin-left: 1.5rem; }
+    .markdown-content strong { font-weight: 600; }
+    .markdown-content code {
+      font-family: monospace;
+      background-color: rgba(0,0,0,0.1);
+      padding: 0.125rem 0.25rem;
+      border-radius: 0.25rem;
+      font-size: 0.875em;
+    }
+    .dark .markdown-content code {
+      background-color: rgba(255,255,255,0.1);
+    }
+    .markdown-content p { margin-bottom: 0.5rem; }
+    .markdown-content p:last-child { margin-bottom: 0; }
+    
+    .typing-indicator span {
+      height: 8px;
+      width: 8px;
+      background-color: #9ca3af; /* gray-400 */
+      border-radius: 50%;
+      display: inline-block;
+      animation: typing-wave 1.4s infinite ease-in-out both;
+    }
+    .dark .typing-indicator span {
+      background-color: #9ca3af; /* gray-400 */
+    }
+    .typing-indicator span:nth-of-type(1) {
+      animation-delay: -0.32s;
+    }
+    .typing-indicator span:nth-of-type(2) {
+      animation-delay: -0.16s;
+    }
+    @keyframes typing-wave {
+      0%, 80%, 100% {
+        transform: scale(0);
+      }
+      40% {
+        transform: scale(1.0);
+      }
+    }
+  </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.22.0",
+    "recharts": "https://esm.sh/recharts@2.12.7?deps=react@18.2.0",
+    "d3": "https://esm.sh/d3@7.9.0",
+    "topojson-client": "https://esm.sh/topojson-client@3.1.0",
+    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "marked": "https://esm.sh/marked@12.0.2",
+    "dompurify": "https://esm.sh/dompurify@3.0.11",
+    "jspdf": "https://esm.sh/jspdf@2.5.1",
+    "html2canvas": "https://esm.sh/html2canvas@1.4.1"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-100 dark:bg-gray-900">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

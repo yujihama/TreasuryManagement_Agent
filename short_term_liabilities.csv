@@ -1,0 +1,4 @@
+liability_id,liability_type,country,branch_office,due_date,amount,currency
+STL-01,Loan Repayment,USA,New York HQ,2024-09-01,50000,USD
+STL-02,Tax Payment,DEU,Berlin Office,2024-08-31,45000,EUR
+STL-03,Rent,GBR,London Office,2024-08-25,15000,GBP

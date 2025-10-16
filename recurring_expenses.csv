@@ -1,0 +1,7 @@
+expense_id,country,branch_office,category,payment_date,amount,currency
+RE-NY-01,USA,New York HQ,Salaries,2024-08-25,150000,USD
+RE-NY-02,USA,New York HQ,Rent,2024-09-01,50000,USD
+RE-NY-03,USA,New York HQ,Software,2024-09-05,10000,USD
+RE-TK-01,JPN,Tokyo Office,Salaries,2024-08-25,12000000,JPY
+RE-TK-02,JPN,Tokyo Office,Rent,2024-08-31,3000000,JPY
+RE-BE-01,DEU,Berlin Office,Salaries,2024-08-25,80000,EUR

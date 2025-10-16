@@ -1,0 +1,21 @@
+expense_id,country,branch_office,category,payment_date,amount,currency
+RE-TK-S-08,JPN,Tokyo HQ,Salaries,2024-08-25,170000000,JPY
+RE-TK-R-09,JPN,Tokyo HQ,Rent,2024-09-01,5000000,JPY
+RE-TK-W-09,JPN,Tokyo HQ,Software,2024-09-05,1000000,JPY
+RE-TK-S-09,JPN,Tokyo HQ,Salaries,2024-09-25,170000000,JPY
+RE-TK-R-10,JPN,Tokyo HQ,Rent,2024-10-01,5000000,JPY
+RE-TK-W-10,JPN,Tokyo HQ,Software,2024-10-05,1000000,JPY
+RE-OS-S-08,JPN,Osaka Office,Salaries,2024-08-25,120000000,JPY
+RE-OS-R-08,JPN,Osaka Office,Rent,2024-08-31,3000000,JPY
+RE-OS-S-09,JPN,Osaka Office,Salaries,2024-09-25,120000000,JPY
+RE-OS-R-09,JPN,Osaka Office,Rent,2024-09-30,3000000,JPY
+RE-BE-S-08,DEU,Berlin Office,Salaries,2024-08-25,80000,EUR
+RE-BE-R-09,DEU,Berlin Office,Rent,2024-09-01,25000,EUR
+RE-BE-S-09,DEU,Berlin Office,Salaries,2024-09-25,80000,EUR
+RE-NY-S-08,USA,New York Office,Salaries,2024-08-25,150000,USD
+RE-NY-R-09,USA,New York Office,Rent,2024-09-01,45000,USD
+RE-NY-S-09,USA,New York Office,Salaries,2024-09-25,150000,USD
+RE-LO-S-08,GBR,London Office,Salaries,2024-08-25,60000,GBP
+RE-LO-R-09,GBR,London Office,Rent,2024-09-01,20000,GBP
+RE-SH-S-08,CHN,Shanghai Office,Salaries,2024-08-25,150000,CNY
+RE-SH-R-09,CHN,Shanghai Office,Rent,2024-09-01,80000,CNY

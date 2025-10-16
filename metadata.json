@@ -1,0 +1,5 @@
+{
+  "name": "Treasury Management Tool",
+  "description": "An enterprise treasury management tool that provides CSV data import, visualization, and an AI chat function for insightful data analysis.",
+  "requestFramePermissions": []
+}
