@@ -23,6 +23,44 @@
     }
     .markdown-content p { margin-bottom: 0.5rem; }
     .markdown-content p:last-child { margin-bottom: 0; }
+    .markdown-content h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-top: 1.5rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid #e5e7eb; /* gray-200 */
+        padding-bottom: 0.5rem;
+    }
+    .dark .markdown-content h3 {
+        border-bottom-color: #374151; /* gray-700 */
+    }
+    .markdown-content h4 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    .markdown-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+        font-size: 0.875em;
+    }
+    .markdown-content th, .markdown-content td {
+        border: 1px solid #e5e7eb; /* gray-200 */
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+    }
+    .markdown-content th {
+        background-color: #f9fafb; /* gray-50 */
+        font-weight: 600;
+    }
+    .dark .markdown-content th, .dark .markdown-content td {
+        border-color: #374151; /* gray-700 */
+    }
+    .dark .markdown-content th {
+        background-color: #1f2937; /* gray-800 */
+    }
     
     .typing-indicator span {
       height: 8px;

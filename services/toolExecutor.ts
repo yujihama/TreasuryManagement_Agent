@@ -17,6 +17,19 @@ export class ToolExecutor {
         this.dataContext = dataSets;
     }
 
+    public getArtifacts(): VisualContent[] {
+        return this.artifacts;
+    }
+
+    public setArtifacts(artifacts: VisualContent[]) {
+        this.artifacts = [...artifacts];
+    }
+
+    public markAllArtifactsAsReviewed(): VisualContent[] {
+        this.artifacts = this.artifacts.map(a => ({ ...a, isReviewed: true }));
+        return [...this.artifacts];
+    }
+
     private getDataset(name: string): DataSet {
         const dataSet = this.intermediateData[name] || this.dataContext[name as keyof DataSets];
         if (!dataSet) throw new Error(`Dataset "${name}" not found.`);
@@ -76,8 +89,24 @@ export class ToolExecutor {
         }
 
         const result = await promise;
-        if (result.artifact && ['table', 'bar_chart', 'pie_chart', 'line_chart', 'world_map'].includes(result.artifact.type)) {
-            this.artifacts.push(result.artifact as VisualContent);
+        if (result.artifact && ['table', 'bar_chart', 'pie_chart', 'line_chart', 'world_map', 'report'].includes(result.artifact.type)) {
+            let newArtifact = result.artifact as VisualContent;
+
+            const originalTitle = newArtifact.title;
+            let finalTitle = originalTitle;
+            let counter = 2;
+            
+            // Generate a unique title by appending a number if a conflict exists.
+            while (this.artifacts.some(a => a.title === finalTitle)) {
+                finalTitle = `${originalTitle} (${counter})`;
+                counter++;
+            }
+            
+            // Create the final artifact with the unique title.
+            const finalArtifact = { ...newArtifact, title: finalTitle };
+
+            this.artifacts.push(finalArtifact);
+            result.artifact = finalArtifact; // Pass the final artifact back to the caller.
         }
         return result;
     }
@@ -617,21 +646,51 @@ export class ToolExecutor {
     }
 
     private async generateReport(title: string, summary: string, artifact_titles: string[]) {
-        const includedArtifacts = this.artifacts.filter(artifact => 
-            artifact_titles.includes(artifact.title)
+        const foundArtifactsResult = artifact_titles.map(requestedTitle => {
+            // Use exact match to find the artifact.
+            return this.artifacts.find(a => a.title === requestedTitle);
+        });
+    
+        const missingTitles = artifact_titles.filter((_, index) => !foundArtifactsResult[index]);
+    
+        // If any artifacts were not found by exact match, this is an error.
+        // The AI needs to be precise. Throw a detailed error to enable self-correction.
+        if (missingTitles.length > 0) {
+            const availableTitles = this.artifacts.map(a => `"${a.title}"`).join(', ');
+            
+            // For each missing title, find possible matches to suggest to the AI.
+            const suggestions = missingTitles.map(missingTitle => {
+                const possibleMatches = this.artifacts
+                    .filter(a => a.title.startsWith(missingTitle))
+                    .map(a => `"${a.title}"`);
+                
+                if (possibleMatches.length > 0) {
+                    return `For the requested title "${missingTitle}", possible matches are: [${possibleMatches.join(', ')}].`;
+                }
+                return `No close match was found for "${missingTitle}".`;
+            }).join(' ');
+    
+            throw new Error(
+                `Report generation failed because some artifact titles were not found or were ambiguous. ` +
+                `Missing titles: [${missingTitles.map(t => `"${t}"`).join(', ')}].\n` +
+                `${suggestions}\n` +
+                `Please call the tool again with the exact titles from the available artifacts list: [${availableTitles}].`
+            );
+        }
+        
+        // Filter out undefined values and remove duplicates while preserving the order from artifact_titles.
+        const validArtifacts = foundArtifactsResult.filter((art): art is VisualContent => art !== undefined);
+        const uniqueOrderedArtifacts = validArtifacts.filter((art, index, self) =>
+            index === self.findIndex((a) => a.title === art.title)
         );
-
-        const orderedArtifacts = artifact_titles
-            .map(title => includedArtifacts.find(a => a.title === title))
-            .filter((a): a is VisualContent => a !== undefined);
-
+    
         const reportArtifact: ReportContent = {
             type: 'report',
             title: title,
             summary: summary,
-            artifacts: orderedArtifacts
+            artifacts: uniqueOrderedArtifacts,
         };
-
+    
         return {
             result: { message: `Report "${title}" has been generated.` },
             artifact: reportArtifact,

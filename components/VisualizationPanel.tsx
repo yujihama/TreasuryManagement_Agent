@@ -6,7 +6,7 @@ import PieChartComponent from './charts/PieChartComponent';
 import LineChartComponent from './charts/LineChartComponent';
 import WorldMapComponent from './charts/WorldMapComponent';
 import ReportComponent from './charts/ReportComponent';
-import { ChartIcon } from './icons';
+import { ChartIcon, CheckCircleIcon } from './icons';
 
 const ArtifactRenderer: React.FC<{ content: VisualContent }> = ({ content }) => {
     return (
@@ -69,10 +69,11 @@ const VisualizationPanel: React.FC<VisualizationPanelProps> = ({ artifacts }) =>
                         <button
                             key={`${artifact.title}-${index}`}
                             onClick={() => setActiveTabIndex(index)}
-                            className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 whitespace-nowrap ${activeTabIndex === index ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'}`}
+                            className={`flex items-center px-4 py-2 text-sm font-medium -mb-px border-b-2 whitespace-nowrap ${activeTabIndex === index ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'}`}
                             title={artifact.title}
                         >
-                            {artifact.title}
+                            <span className="truncate">{artifact.title}</span>
+                             {artifact.isReviewed && <CheckCircleIcon className="w-4 h-4 ml-2 text-green-500 flex-shrink-0" />}
                         </button>
                     ))}
                 </div>

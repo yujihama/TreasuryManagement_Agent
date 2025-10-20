@@ -23,6 +23,7 @@ export interface TableContent {
     type: 'table';
     title: string;
     data: DataSet;
+    isReviewed?: boolean;
 }
 
 export interface BarChartContent {
@@ -31,6 +32,7 @@ export interface BarChartContent {
     data: CsvRow[];
     categoryKey: string;
     valueKey: string;
+    isReviewed?: boolean;
 }
 
 export interface PieChartContent {
@@ -39,6 +41,7 @@ export interface PieChartContent {
     data: CsvRow[];
     nameKey: string;
     valueKey: string;
+    isReviewed?: boolean;
 }
 
 export interface LineChartContent {
@@ -47,6 +50,7 @@ export interface LineChartContent {
     data: CsvRow[];
     xKey: string;
     yKeys: string[];
+    isReviewed?: boolean;
 }
 
 export interface WorldMapContent {
@@ -55,6 +59,7 @@ export interface WorldMapContent {
     data: CsvRow[];
     locationKey: string;
     valueKey: string;
+    isReviewed?: boolean;
 }
 
 export interface ReportContent {
@@ -62,6 +67,7 @@ export interface ReportContent {
     title: string;
     summary: string;
     artifacts: VisualContent[];
+    isReviewed?: boolean;
 }
 
 export type VisualContent = TableContent | BarChartContent | PieChartContent | LineChartContent | WorldMapContent | ReportContent;
@@ -108,7 +114,6 @@ export interface AnalysisStep {
 export interface StrategistResponse {
     is_clear: boolean;
     questions_for_user: string[];
-    recommendations_for_user: string[];
     instructions_for_planner_ai: string;
 }
 

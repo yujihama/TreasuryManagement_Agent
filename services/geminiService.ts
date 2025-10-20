@@ -1,6 +1,6 @@
 
 import { FunctionDeclaration, Type, Part, Chat, GenerateContentResponse, GoogleGenAI } from '@google/genai';
-import type { DataSets, AnalysisStep, MessageContent, StrategistResponse, ClarificationState, VisualContent, ChatMessage } from '../types';
+import type { DataSets, AnalysisStep, MessageContent, StrategistResponse, ClarificationState, VisualContent, ChatMessage, TextContent } from '../types';
 import type { ToolExecutor } from './toolExecutor';
 import { FINAL_REVIEWER_PROMPT, STRATEGIST_PROMPT } from '../constants';
 
@@ -138,7 +138,7 @@ const toolSchemas: FunctionDeclaration[] = [
             type: Type.OBJECT,
             properties: {
                 dataset_name: { type: Type.STRING, description: 'Name of the dataset to render.' },
-                title: { type: Type.STRING, description: 'The title of the table.' },
+                title: { type: Type.STRING, description: 'The title of the table. It must be concise, descriptive, and ideally under 30 characters.' },
             },
             required: ['dataset_name', 'title'],
         },
@@ -152,7 +152,7 @@ const toolSchemas: FunctionDeclaration[] = [
                 dataset_name: { type: Type.STRING, description: 'Name of the dataset to visualize.' },
                 category_column: { type: Type.STRING, description: 'The column for the X-axis (categories).' },
                 value_column: { type: Type.STRING, description: 'The column for the Y-axis (values).' },
-                title: { type: Type.STRING, description: 'The title of the chart.' },
+                title: { type: Type.STRING, description: 'The title of the chart. It must be concise, descriptive, and ideally under 30 characters.' },
             },
             required: ['dataset_name', 'category_column', 'value_column', 'title'],
         },
@@ -166,7 +166,7 @@ const toolSchemas: FunctionDeclaration[] = [
                 dataset_name: { type: Type.STRING, description: 'Name of the dataset to visualize.' },
                 name_column: { type: Type.STRING, description: 'The column for the slice names.' },
                 value_column: { type: Type.STRING, description: 'The column for the slice values.' },
-                title: { type: Type.STRING, description: 'The title of the chart.' },
+                title: { type: Type.STRING, description: 'The title of the chart. It must be concise, descriptive, and ideally under 30 characters.' },
             },
             required: ['dataset_name', 'name_column', 'value_column', 'title'],
         },
@@ -180,7 +180,7 @@ const toolSchemas: FunctionDeclaration[] = [
                 dataset_name: { type: Type.STRING, description: 'Name of the dataset to visualize.' },
                 x_column: { type: Type.STRING, description: 'The column for the X-axis.' },
                 y_columns: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'The column(s) for the Y-axis.' },
-                title: { type: Type.STRING, description: 'The title of the chart.' },
+                title: { type: Type.STRING, description: 'The title of the chart. It must be concise, descriptive, and ideally under 30 characters.' },
             },
             required: ['dataset_name', 'x_column', 'y_columns', 'title'],
         },
@@ -194,7 +194,7 @@ const toolSchemas: FunctionDeclaration[] = [
                 dataset_name: { type: Type.STRING, description: 'Name of the dataset to visualize.' },
                 location_column: { type: Type.STRING, description: 'The column containing country codes (ISO 3166-1 alpha-3).' },
                 value_column: { type: Type.STRING, description: 'The column for the data point values (e.g., magnitude).' },
-                title: { type: Type.STRING, description: 'The title of the map.' },
+                title: { type: Type.STRING, description: 'The title of the map. It must be concise, descriptive, and ideally under 30 characters.' },
             },
             required: ['dataset_name', 'location_column', 'value_column', 'title'],
         },
@@ -205,9 +205,9 @@ const toolSchemas: FunctionDeclaration[] = [
         parameters: {
             type: Type.OBJECT,
             properties: {
-                title: { type: Type.STRING, description: 'The title of the final report.' },
+                title: { type: Type.STRING, description: 'The title of the final report. It must be concise, descriptive, and ideally under 30 characters.' },
                 summary: { type: Type.STRING, description: 'A detailed summary of the analysis findings, written in Markdown format.' },
-                artifact_titles: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'An array of titles of the charts, maps, or tables to include in the report.' },
+                artifact_titles: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'An array of exact titles of the previously generated charts, maps, or tables to include in the report. You must use the exact titles from the artifacts you created earlier.' },
             },
             required: ['title', 'summary', 'artifact_titles'],
         },
@@ -222,6 +222,7 @@ interface RunChatCallbacks {
     onPlanGenerated: (plan: AnalysisStep[]) => void;
     onStepUpdate: (updatedStep: AnalysisStep) => void;
     onArtifactGenerated: (artifact: VisualContent) => void;
+    onReviewCompleted: (reviewedArtifacts: VisualContent[]) => void;
     onIntermediateMessage: (message: string) => void;
     onFinalAnswer: (answer: string) => void;
     onAnalysisStart?: () => void;
@@ -264,20 +265,25 @@ function translateErrorMessage(errorMessage: string): string {
     return "分析中に予期せぬエラーが発生しました。";
 }
 
-async function callStrategist(ai: GoogleGenAI, originalQuery: string, dataSets: DataSets, history: ClarificationState['history']): Promise<StrategistResponse> {
-    const model = 'gemini-2.5-flash';
+async function callStrategist(ai: GoogleGenAI, userQuery: string, dataSets: DataSets, history: ChatMessage[]): Promise<StrategistResponse> {
+    const model = 'gemini-2.5-pro';
     
     const schemaSummaries = Object.entries(dataSets)
         .map(([name, ds]) => `- ${name}: [${ds.stats.columnNames.join(', ')}]`)
         .join('\n');
     
     const conversationHistory = history
-        .map(turn => `${turn.role === 'model' ? 'AI' : 'User'}: ${turn.text}`)
+        .filter(msg => msg.content[0]?.type === 'text' && !msg.isThinking)
+        .map(msg => {
+            const role = msg.role === 'model' ? 'AI' : 'User';
+            const text = (msg.content[0] as TextContent).text.replace('[USER_INPUT_REQUIRED]', '').trim();
+            return `${role}: ${text}`;
+        })
         .join('\n');
     
     const prompt = STRATEGIST_PROMPT
         .replace('{DATASET_SCHEMAS}', schemaSummaries)
-        .replace('{USER_QUERY}', originalQuery)
+        .replace('{USER_QUERY}', userQuery)
         .replace('{CONVERSATION_HISTORY}', conversationHistory || 'なし');
 
     const maxRetries = 3;
@@ -315,7 +321,6 @@ async function callStrategist(ai: GoogleGenAI, originalQuery: string, dataSets: 
     return {
         is_clear: true,
         questions_for_user: [],
-        recommendations_for_user: [],
         instructions_for_planner_ai: "ストラテジストAIの呼び出しに失敗しました。ユーザーのクエリを直接処理してください。"
     };
 }
@@ -323,13 +328,13 @@ async function callStrategist(ai: GoogleGenAI, originalQuery: string, dataSets: 
 
 async function callFinalReviewer(
     ai: GoogleGenAI,
-    userQuery: string,
+    analysisInstruction: string,
     analysisPlan: AnalysisStep[],
-    finalAnswerDraft: string
+    finalAnswerDraft: string,
+    artifacts: VisualContent[]
 ): Promise<ReviewResult> {
-    const model = 'gemini-2.5-flash';
+    const model = 'gemini-2.5-pro';
     
-    // Sanitize plan for the prompt to avoid excessive length
     const summarizedPlan = analysisPlan.map(step => ({
         tool: step.toolCall.name,
         args: step.toolCall.args,
@@ -342,15 +347,21 @@ async function callFinalReviewer(
         } : null
     }));
 
+    const summarizedArtifacts = artifacts.map(a => ({
+        type: a.type,
+        title: a.title,
+        isReviewed: !!a.isReviewed,
+    }));
+
     const prompt = `
 ${FINAL_REVIEWER_PROMPT}
 
 ---
 **レビュー対象:**
 
-**1. ユーザーの元のクエリ:**
+**1. 分析指示:**
 \`\`\`
-${userQuery}
+${analysisInstruction}
 \`\`\`
 
 **2. 完全な分析計画:**
@@ -358,7 +369,12 @@ ${userQuery}
 ${JSON.stringify(summarizedPlan, null, 2)}
 \`\`\`
 
-**3. 最終テキスト草案:**
+**3. 生成された成果物リスト:**
+\`\`\`json
+${JSON.stringify(summarizedArtifacts, null, 2)}
+\`\`\`
+
+**4. 最終テキスト草案:**
 \`\`\`markdown
 ${finalAnswerDraft}
 \`\`\`
@@ -374,7 +390,6 @@ ${finalAnswerDraft}
             }
         });
         
-        // Clean the response text to ensure it's valid JSON
         let jsonStr = response.text.trim();
         if (jsonStr.startsWith("```json")) {
             jsonStr = jsonStr.substring(7, jsonStr.length - 3).trim();
@@ -409,40 +424,24 @@ export async function runChat(
     toolExecutor.loadData(dataSets);
 
     let currentMessage: string | Part[];
-    let userQueryForReviewer = message;
+    let analysisInstructionForReviewer = '';
+    let newArtifactGeneratedThisTurn = false;
+    
+    // If we are in a clarification loop, continue it.
+    // Otherwise, any new message from the user triggers the strategist to define the next task.
+    if (clarificationState) {
+        // This is a response to a clarification question from the strategist.
+        const activeClarificationState: ClarificationState = {
+            ...clarificationState,
+            history: [...clarificationState.history, { role: 'user', text: message }]
+        };
 
-    // Strategist should only run for new queries, or when in a clarification loop with the strategist.
-    // If a plan already exists, we are in a conversation with the planner AI.
-    const shouldRunStrategist = existingPlan.length === 0 || clarificationState;
-
-    if (shouldRunStrategist) {
-        let activeClarificationState: ClarificationState;
-
-        if (clarificationState) {
-            // This is a response to a clarification question from the strategist.
-            activeClarificationState = {
-                ...clarificationState,
-                history: [...clarificationState.history, { role: 'user', text: message }]
-            };
-        } else {
-            // This is a new query.
-            activeClarificationState = {
-                originalQuery: message,
-                history: []
-            };
-        }
-
-        userQueryForReviewer = activeClarificationState.originalQuery;
-
-        // --- Clarification Loop ---
-        const strategistResponse = await callStrategist(ai, activeClarificationState.originalQuery, dataSets, activeClarificationState.history);
+        const strategistHistoryForContext = chatHistory.slice(0, -1); // Exclude the user's current message
+        const strategistResponse = await callStrategist(ai, message, dataSets, strategistHistoryForContext);
 
         if (!strategistResponse.is_clear) {
-            const formattedRecommendations = strategistResponse.recommendations_for_user.length > 0
-                ? `${strategistResponse.recommendations_for_user.join('\n')}\n\n`
-                : '';
             const formattedQuestions = strategistResponse.questions_for_user.join('\n');
-            const fullQuestion = `${formattedRecommendations}${formattedQuestions}\n\n[USER_INPUT_REQUIRED]`;
+            const fullQuestion = `${formattedQuestions}\n\n[USER_INPUT_REQUIRED]`;
 
             const newHistoryEntry = { role: 'model' as const, text: fullQuestion };
             const updatedState: ClarificationState = {
@@ -457,26 +456,43 @@ export async function runChat(
             };
         }
         
-        // --- Analysis Execution ---
-        callbacks.onRefinedInstruction?.(strategistResponse.instructions_for_planner_ai);
+        analysisInstructionForReviewer = strategistResponse.instructions_for_planner_ai;
+        callbacks.onRefinedInstruction?.(analysisInstructionForReviewer);
         callbacks.onAnalysisStart?.();
 
         const initialPlannerMessage = `The user's request is: "${activeClarificationState.originalQuery}".
-After a clarification conversation, the refined instruction for you is: "${strategistResponse.instructions_for_planner_ai}".
+After a clarification conversation, the refined instruction for you is: "${analysisInstructionForReviewer}".
 Please create and execute a detailed, step-by-step plan based on this refined instruction.`;
         
         currentMessage = initialPlannerMessage;
+
     } else {
-        // This is a reply to the Planner AI, not a new query.
-        // Send the user's message directly to continue the existing conversation.
-        currentMessage = message;
-        // Try to find the original query from the plan or last clarification for the reviewer
-        // This is imperfect but better than just the latest message.
-        // A more robust solution would be to thread the original query through the state.
-        const firstUserMessageInHistory = chatHistory.find(h => h.role === 'user');
-        if (firstUserMessageInHistory && firstUserMessageInHistory.content[0]?.type === 'text') {
-            userQueryForReviewer = firstUserMessageInHistory.content[0].text;
+        // This is a new query or a follow-up instruction. Run the strategist.
+        const strategistResponse = await callStrategist(ai, message, dataSets, chatHistory.slice(0, -1));
+
+        if (!strategistResponse.is_clear) {
+            const formattedQuestions = strategistResponse.questions_for_user.join('\n');
+            const fullQuestion = `${formattedQuestions}\n\n[USER_INPUT_REQUIRED]`;
+
+             const newClarificationState: ClarificationState = {
+                originalQuery: message,
+                history: [{ role: 'model', text: fullQuestion }]
+            };
+
+            return {
+                status: 'clarification_needed',
+                question: fullQuestion,
+                context: newClarificationState
+            };
         }
+        
+        analysisInstructionForReviewer = strategistResponse.instructions_for_planner_ai;
+        callbacks.onRefinedInstruction?.(analysisInstructionForReviewer);
+        callbacks.onAnalysisStart?.();
+
+        const initialPlannerMessage = `Based on the user's latest request ("${message}") and the conversation history, the refined instruction for you is: "${analysisInstructionForReviewer}". Please create and execute a step-by-step plan based on this refined instruction. If previous analysis steps have already produced necessary data, you may reuse it.`;
+
+        currentMessage = initialPlannerMessage;
     }
 
 
@@ -485,7 +501,6 @@ Please create and execute a detailed, step-by-step plan based on this refined in
     let emptyResponseCount = 0;
     const MAX_TURNS = 200;
     
-    // Error handling
     let consecutiveErrors = 0;
     const MAX_CONSECUTIVE_ERRORS = 2;
 
@@ -495,22 +510,17 @@ Please create and execute a detailed, step-by-step plan based on this refined in
         const responseText = result.text;
         const functionCalls = result.functionCalls;
 
-        // --- Handle Empty Response ---
         if (!responseText && (!functionCalls || functionCalls.length === 0)) {
             emptyResponseCount++;
             if (emptyResponseCount > 1) {
-                // Give up after the second consecutive empty response.
                 break;
             }
-
-            // Attempt to recover from a single empty response
             callbacks.onIntermediateMessage("AIの応答が空でした。結果を要約するように再試行します。");
             currentMessage = "You have not provided a response or a tool call. Please review the work you have done in the previous steps and provide a final answer summarizing your findings to the user in Markdown format.";
             continue;
         }
 
-        // --- Process Valid Response ---
-        emptyResponseCount = 0; // Reset counter on any valid response.
+        emptyResponseCount = 0;
         
         const runningRevisionStep = fullPlan.find(s => (s.toolCall.name === 'revise_plan_based_on_feedback' || s.toolCall.name === 'revise_plan_due_to_error') && s.status === 'running');
         if (runningRevisionStep && functionCalls && functionCalls.length > 0) {
@@ -519,7 +529,6 @@ Please create and execute a detailed, step-by-step plan based on this refined in
             fullPlan = fullPlan.map(s => s.id === completedRevisionStep.id ? completedRevisionStep : s);
         }
         
-        // --- Handle Response ---
         if (responseText?.includes('[USER_INPUT_REQUIRED]')) {
             callbacks.onFinalAnswer(responseText.trim());
             return { status: 'completed' };
@@ -548,12 +557,16 @@ Please create and execute a detailed, step-by-step plan based on this refined in
                 callbacks.onStepUpdate({ ...step, status: 'running' });
                 try {
                     const { result, artifact, newDataSet } = await toolExecutor.execute(step.toolCall);
-                    consecutiveErrors = 0; // Reset on success
+                    consecutiveErrors = 0; 
+                    if (artifact) {
+                        newArtifactGeneratedThisTurn = true;
+                        callbacks.onArtifactGenerated(artifact as VisualContent);
+                    }
                     toolExecutionParts.push({ functionResponse: { name: step.toolCall.name, response: result, id: step.toolCall.id } });
                     const updatedStep: AnalysisStep = { ...step, status: 'completed', result, resultDataset: newDataSet };
                     callbacks.onStepUpdate(updatedStep);
                     fullPlan = fullPlan.map(s => s.id === updatedStep.id ? updatedStep : s);
-                    if (artifact) callbacks.onArtifactGenerated(artifact as VisualContent);
+
                 } catch (e: any) {
                     consecutiveErrors++;
                     const errorMessage = e.message || '不明なツールエラーが発生しました。';
@@ -579,7 +592,7 @@ Please create and execute a detailed, step-by-step plan based on this refined in
                         fullPlan.push(revisionStep);
                         callbacks.onPlanGenerated(fullPlan);
                         
-                        selfCorrectionPrompt = `The tool call '${step.toolCall.name}' failed with the error: "${errorMessage}". This is the first failure. Do not apologize. You must analyze this error and the previous steps. Then, generate a new plan to achieve the original goal ("${userQueryForReviewer}"), avoiding this error. Proceed with the corrected plan.`;
+                        selfCorrectionPrompt = `The tool call '${step.toolCall.name}' failed with the error: "${errorMessage}". This is the first failure. Do not apologize. You must analyze this error and the previous steps. Then, generate a new plan to achieve the original goal ("${analysisInstructionForReviewer}"), avoiding this error. Proceed with the corrected plan.`;
                         break; 
                     }
                 }
@@ -596,18 +609,23 @@ Please create and execute a detailed, step-by-step plan based on this refined in
         }
         
         if (responseText) {
+            if (!newArtifactGeneratedThisTurn) {
+                callbacks.onFinalAnswer(responseText);
+                return { status: 'completed' };
+            }
+
             const reviewStep: AnalysisStep = {
                 id: `as-${Date.now()}-review`,
                 step: fullPlan.length + 1,
-                description: 'AIの回答とビジュアルをレビュー',
+                description: 'AIの回答と成果物をレビュー中',
                 status: 'pending',
                 toolCall: { name: 'conduct_final_review', args: {} },
             };
             fullPlan.push(reviewStep);
             callbacks.onPlanGenerated(fullPlan);
             
-            callbacks.onStepUpdate({ ...reviewStep, status: 'running' });
-            const reviewResult = await callFinalReviewer(ai, userQueryForReviewer, fullPlan, responseText);
+            callbacks.onStepUpdate({ ...reviewStep, status: 'reviewing' });
+            const reviewResult = await callFinalReviewer(ai, analysisInstructionForReviewer, fullPlan, responseText, toolExecutor.getArtifacts());
             
             if (reviewResult.decision === 'revise' && reviewResult.feedback) {
                 const warningStep: AnalysisStep = { ...reviewStep, status: 'warning', result: { feedback: reviewResult.feedback } };
@@ -629,6 +647,8 @@ Please create and execute a detailed, step-by-step plan based on this refined in
             } else {
                 const completedStep: AnalysisStep = { ...reviewStep, status: 'completed', result: { message: '承認されました。' } };
                 callbacks.onStepUpdate(completedStep);
+                const reviewedArtifacts = toolExecutor.markAllArtifactsAsReviewed();
+                callbacks.onReviewCompleted(reviewedArtifacts);
                 callbacks.onFinalAnswer(reviewResult.revisedText || responseText);
                 return { status: 'completed' };
             }
@@ -640,7 +660,6 @@ Please create and execute a detailed, step-by-step plan based on this refined in
     } else if (turn >= MAX_TURNS) {
         callbacks.onFinalAnswer("分析が最大ステップ数に達したため停止しました。");
     } else {
-        // This case is triggered by the 'break' when an empty response is received repeatedly.
         callbacks.onFinalAnswer("AIからの応答が空でした。分析を終了します。");
     }
 

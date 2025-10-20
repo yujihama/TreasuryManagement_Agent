@@ -1,16 +1,28 @@
 liability_id,liability_type,country,branch_office,due_date,amount,currency
-STL-01,Loan Repayment,JPN,Tokyo HQ,2024-09-01,50000000,JPY
-STL-02,Tax Payment,DEU,Berlin Office,2024-08-31,45000,EUR
-STL-03,Rent,GBR,London Office,2024-08-25,15000,GBP
-STL-04,Interest Payment,JPN,Tokyo HQ,2024-08-31,25000000,JPY
-STL-05,Equipment Lease,USA,New York Office,2024-09-15,25000,USD
-STL-06,Tax Payment,JPN,Tokyo HQ,2024-09-30,150000000,JPY
-STL-07,Loan Repayment,GBR,London Office,2024-10-01,30000,GBP
-STL-08,Insurance Premium,JPN,Osaka Office,2024-09-01,750000,JPY
-STL-09,Tax Payment,CHN,Shanghai Office,2024-10-28,180000,CNY
-STL-10,Interest Payment,USA,New York Office,2024-09-30,12000,USD
-STL-11,Loan Repayment,DEU,Berlin Office,2024-11-01,20000,EUR
-STL-12,Tax Payment,JPN,Osaka Office,2024-09-30,22000000,JPY
-STL-13,Equipment Lease,JPN,Nagoya Office,2024-09-20,1200000,JPY
-STL-14,Tax Payment,USA,New York Office,2024-10-15,85000,USD
-STL-15,Loan Repayment,JPN,Tokyo HQ,2024-12-01,500000000,JPY
+STL-2310-01,Loan Repayment,DEU,Berlin Office,2023-10-01,20000,EUR
+STL-2310-02,Tax Payment,USA,New York Office,2023-10-15,80000,USD
+STL-2311-01,Insurance Premium,JPN,Osaka Office,2023-11-01,700000,JPY
+STL-2312-01,Loan Repayment,JPN,Tokyo HQ,2023-12-01,450000000,JPY
+STL-2401-01,Equipment Lease,GBR,London Office,2024-01-10,8000,GBP
+STL-2401-02,Tax Payment,JPN,Tokyo HQ,2024-01-31,120000000,JPY
+STL-2402-01,Interest Payment,USA,New York Office,2024-02-28,11000,USD
+STL-2403-01,Loan Repayment,CHN,Shanghai Office,2024-03-15,500000,CNY
+STL-2404-01,Tax Payment,DEU,Berlin Office,2024-04-30,40000,EUR
+STL-2405-01,Equipment Lease,JPN,Nagoya Office,2024-05-20,1100000,JPY
+STL-2406-01,Loan Repayment,USA,New York Office,2024-06-01,45000,USD
+STL-2407-01,Tax Payment,JPN,Osaka Office,2024-07-31,20000000,JPY
+STL-2408-01,Rent,GBR,London Office,2024-08-25,15000,GBP
+STL-2408-02,Tax Payment,DEU,Berlin Office,2024-08-31,45000,EUR
+STL-2408-03,Interest Payment,JPN,Tokyo HQ,2024-08-31,25000000,JPY
+STL-2409-01,Loan Repayment,JPN,Tokyo HQ,2024-09-01,50000000,JPY
+STL-2409-02,Insurance Premium,JPN,Osaka Office,2024-09-01,750000,JPY
+STL-2409-03,Equipment Lease,USA,New York Office,2024-09-15,25000,USD
+STL-2409-04,Equipment Lease,JPN,Nagoya Office,2024-09-20,1200000,JPY
+STL-2409-05,Tax Payment,JPN,Tokyo HQ,2024-09-30,150000000,JPY
+STL-2409-06,Interest Payment,USA,New York Office,2024-09-30,12000,USD
+STL-2409-07,Tax Payment,JPN,Osaka Office,2024-09-30,22000000,JPY
+STL-2410-01,Loan Repayment,GBR,London Office,2024-10-01,30000,GBP
+STL-2410-02,Tax Payment,USA,New York Office,2024-10-15,85000,USD
+STL-2410-03,Tax Payment,CHN,Shanghai Office,2024-10-28,180000,CNY
+STL-2411-01,Loan Repayment,DEU,Berlin Office,2024-11-01,20000,EUR
+STL-2412-01,Loan Repayment,JPN,Tokyo HQ,2024-12-01,500000000,JPY

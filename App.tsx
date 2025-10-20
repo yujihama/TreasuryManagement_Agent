@@ -213,6 +213,9 @@ const App: React.FC = () => {
         try {
             const contextToUse = clarificationState;
 
+            // Sync the executor with the current app state before the run
+            toolExecutorRef.current.setArtifacts(artifacts);
+
             const result = await runChat(chat, ai, message, dataSets, toolExecutorRef.current, {
                 onRefinedInstruction: (instruction) => {
                     setRefinedInstruction(instruction);
@@ -227,24 +230,19 @@ const App: React.FC = () => {
                      setAnalysisPlan(prevPlan => prevPlan.map(s => s.id === updatedStep.id ? updatedStep : s));
                 },
                 onArtifactGenerated: (artifact) => {
-                    if (isVisualContent(artifact)) {
-                        // Don't add plain tables to the visualization panel.
-                        // They are still available within the tool executor for report generation.
-                        if (artifact.type !== 'table') {
-                            setArtifacts(prev => [...prev, artifact]);
-                            // Also, don't notify the user about table or report generation, as they are handled differently.
-                            if (artifact.type !== 'report') {
-                                 const notificationMessage: ChatMessage = {
-                                    id: Date.now() + Math.random(),
-                                    role: 'model',
-                                    content: [{ type: 'text', text: `「${artifact.title}」の視覚化を生成しました。右側のパネルで表示できます。` }]
-                                };
-                                setChatHistory(prev => [...prev, notificationMessage]);
-                            }
-                        }
-                    } else {
-                         // Handle non-visual artifacts if any, maybe as text.
+                    setArtifacts(prev => [...prev, artifact]);
+
+                    if (artifact.type !== 'table' && artifact.type !== 'report') {
+                         const notificationMessage: ChatMessage = {
+                            id: Date.now() + Math.random(),
+                            role: 'model',
+                            content: [{ type: 'text', text: `「${artifact.title}」の視覚化を生成しました。右側のパネルで表示できます。` }]
+                        };
+                        setChatHistory(prev => [...prev, notificationMessage]);
                     }
+                },
+                onReviewCompleted: (reviewedArtifacts) => {
+                    setArtifacts(reviewedArtifacts);
                 },
                 onIntermediateMessage: (interimMessage) => {
                     const message: ChatMessage = {
@@ -292,7 +290,7 @@ const App: React.FC = () => {
             setIsLoading(false);
         }
 
-    }, [isLoading, dataSets, analysisPlan, clarificationState, chatHistory]);
+    }, [isLoading, dataSets, analysisPlan, clarificationState, chatHistory, artifacts]);
 
     if (isDataLoading) {
         return (
