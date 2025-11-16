@@ -37,6 +37,17 @@ const isoNumericToAlpha3: Record<string, string> = {
     '328': 'GUY', '446': 'MAC', '028': 'ATG', '535': 'BES',
 };
 
+// A simple mapping from ISO 3166-1 alpha-2 to alpha-3
+const isoAlpha2ToAlpha3: Record<string, string> = {
+    JP: 'JPN', US: 'USA', DE: 'DEU', FR: 'FRA', GB: 'GBR',
+    CN: 'CHN', CA: 'CAN', AU: 'AUS', IN: 'IND', CH: 'CHE',
+    BR: 'BRA', SG: 'SGP', HK: 'HKG', MX: 'MEX', SE: 'SWE',
+    KR: 'KOR', ZA: 'ZAF', ES: 'ESP', NL: 'NLD', IT: 'ITA',
+    IE: 'IRL', NO: 'NOR', DK: 'DNK', PL: 'POL', TW: 'TWN',
+    TH: 'THA', MY: 'MYS', PH: 'PHL', ID: 'IDN', NZ: 'NZL',
+    // We can add more as needed
+};
+
 const WorldMapComponent: React.FC<WorldMapContent> = ({ data, title, locationKey, valueKey }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const tooltipRef = useRef<HTMLDivElement>(null);
@@ -53,11 +64,10 @@ const WorldMapComponent: React.FC<WorldMapContent> = ({ data, title, locationKey
     useEffect(() => {
         if (!world || !svgRef.current || !tooltipRef.current || !containerRef.current) return;
 
-        const isDarkMode = document.documentElement.classList.contains('dark');
-        const mapBgColor = isDarkMode ? '#1f2937' : '#f9fafb'; // gray-800 / gray-50
-        const countryFill = isDarkMode ? '#4b5563' : '#e5e7eb'; // gray-600 / gray-200
-        const countryStroke = isDarkMode ? '#111827' : '#ffffff'; // gray-900 / white
-        const hoverFill = isDarkMode ? '#6366F1' : '#a5b4fc'; // indigo-500 / indigo-300
+        const mapBgColor = '#f9fafb'; // gray-50
+        const countryFill = '#e5e7eb'; // gray-200
+        const countryStroke = '#ffffff'; // white
+        const hoverFill = '#a5b4fc'; // indigo-300
 
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove(); // Clear previous render
@@ -114,10 +124,14 @@ const WorldMapComponent: React.FC<WorldMapContent> = ({ data, title, locationKey
         });
 
         data.forEach(d => {
-            const country = d[locationKey] as string;
+            let countryCode = d[locationKey] as string;
+            // Handle 2-letter codes if provided
+            if (countryCode && countryCode.length === 2) {
+                countryCode = isoAlpha2ToAlpha3[countryCode.toUpperCase()] || countryCode;
+            }
             const value = d[valueKey] as number;
-            if (country && typeof value === 'number' && countryCentroids[country]) {
-                countryData[country] = (countryData[country] || 0) + value;
+            if (countryCode && typeof value === 'number' && countryCentroids[countryCode]) {
+                countryData[countryCode] = (countryData[countryCode] || 0) + value;
             }
         });
 
@@ -180,8 +194,8 @@ const WorldMapComponent: React.FC<WorldMapContent> = ({ data, title, locationKey
     }
 
     return (
-        <div ref={containerRef} className="relative p-4 bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200">{title}</h3>
+        <div ref={containerRef} className="relative p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">{title}</h3>
             <svg ref={svgRef} className="w-full h-auto rounded"></svg>
             <div 
                 ref={tooltipRef} 

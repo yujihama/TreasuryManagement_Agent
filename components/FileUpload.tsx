@@ -1,4 +1,3 @@
-
 import React, { useCallback } from 'react';
 import type { DataSet, CsvRow } from '../types';
 import { UploadIcon } from './icons';
@@ -40,8 +39,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, title }) => {
     }, [onFileUpload]);
 
     return (
-        <label htmlFor={`file-upload-${title}`} className="cursor-pointer w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate pr-2">{title}</span>
+        <label htmlFor={`file-upload-${title}`} className="cursor-pointer w-full p-2 border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700 truncate pr-2">{title}</span>
             <UploadIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
             <input
                 id={`file-upload-${title}`}

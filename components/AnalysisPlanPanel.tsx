@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { AnalysisStep, CsvRow } from '../types';
 import { CheckCircleIcon, ClockIcon, ExclamationIcon, SpinnerIcon, ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon } from './icons';
@@ -28,17 +27,17 @@ const PreviewTable: React.FC<{ rows: CsvRow[] }> = ({ rows }) => {
     const headers = Object.keys(rows[0]);
 
     return (
-        <div className="mt-2 overflow-x-auto rounded-md border border-gray-200 dark:border-gray-600">
+        <div className="mt-2 overflow-x-auto rounded-md border border-gray-200">
             <table className="w-full text-xs">
-                <thead className="bg-gray-100 dark:bg-gray-700">
+                <thead className="bg-gray-100">
                     <tr>
-                        {headers.map(h => <th key={h} className="p-1.5 font-semibold text-left text-gray-600 dark:text-gray-300">{h}</th>)}
+                        {headers.map(h => <th key={h} className="p-1.5 font-semibold text-left text-gray-600">{h}</th>)}
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                <tbody className="divide-y divide-gray-200">
                     {rows.map((row, i) => (
-                        <tr key={i} className="bg-white dark:bg-gray-800">
-                            {headers.map(h => <td key={h} className="p-1.5 text-gray-500 dark:text-gray-400 font-mono truncate max-w-[120px]" title={String(row[h] ?? '')}>{String(row[h] ?? '')}</td>)}
+                        <tr key={i} className="bg-white">
+                            {headers.map(h => <td key={h} className="p-1.5 text-gray-500 font-mono truncate max-w-[120px]" title={String(row[h] ?? '')}>{String(row[h] ?? '')}</td>)}
                         </tr>
                     ))}
                 </tbody>
@@ -50,12 +49,27 @@ const PreviewTable: React.FC<{ rows: CsvRow[] }> = ({ rows }) => {
 const StepResult: React.FC<{ step: AnalysisStep }> = ({ step }) => {
     if (step.status !== 'completed' || !step.result) return null;
 
-    const { new_dataset_name, rows, columns, preview_rows, message } = step.result;
+    const { new_dataset_name, rows, columns, preview_rows, message, statistics, data_preview } = step.result;
+
+    if (statistics) {
+        return (
+            <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-50 rounded border border-gray-200 space-y-1.5">
+                {Object.entries(statistics).map(([key, value]) => (
+                     <div key={key} className="flex justify-between items-center">
+                         <span className="font-semibold capitalize text-gray-700">{key.replace(/_/g, ' ')}:</span>
+                         <code className="ml-2 text-xs bg-gray-200 px-1.5 py-0.5 rounded font-mono text-gray-800">{String(value ?? 'N/A')}</code>
+                     </div>
+                ))}
+            </div>
+        )
+    }
 
     if (new_dataset_name) {
+        // The resultDataset is already displayed via TableComponent, so we only show the name and row count here
+        // to avoid redundant previews in the analysis plan panel.
         return (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                生成済み: <code className="text-xs bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded font-mono">{new_dataset_name}</code> ({rows} 行)
+            <p className="text-xs text-gray-500 mt-1">
+                生成済み: <code className="text-xs bg-gray-200 px-1 py-0.5 rounded font-mono">{new_dataset_name}</code> ({rows} 行)
             </p>
         );
     }
@@ -65,14 +79,14 @@ const StepResult: React.FC<{ step: AnalysisStep }> = ({ step }) => {
         const typedColumns = columns as {name: string, type: string}[];
         const columnDetails = typedColumns.map(c => `${c.name} (${c.type})`).join(', ');
         return (
-             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 space-y-2">
+             <div className="text-xs text-gray-500 mt-1 space-y-2">
                 <div>
-                    <span className="font-semibold text-gray-700 dark:text-gray-300">列: </span>
+                    <span className="font-semibold text-gray-700">列: </span>
                     <span className="font-mono">{columnDetails}</span>
                 </div>
                 {preview_rows && preview_rows.length > 0 && (
                     <div>
-                        <span className="font-semibold text-gray-700 dark:text-gray-300">データプレビュー:</span>
+                        <span className="font-semibold text-gray-700">データプレビュー:</span>
                         <PreviewTable rows={preview_rows} />
                     </div>
                 )}
@@ -82,14 +96,14 @@ const StepResult: React.FC<{ step: AnalysisStep }> = ({ step }) => {
 
     if (columns && Array.isArray(columns) && columns.length > 0 && typeof columns[0] === 'string') {
         return (
-             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+             <p className="text-xs text-gray-500 mt-1 truncate">
                 列: <span className="font-mono">{columns.join(', ')}</span>
             </p>
         );
     }
 
     if (message) {
-        return <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{message}</p>;
+        return <p className="text-xs text-gray-500 mt-1">{message}</p>;
     }
     
     return null;
@@ -110,11 +124,11 @@ const ToolParameters: React.FC<{ toolCall: any }> = ({ toolCall }) => {
     }
 
     return (
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 border-l-2 border-gray-200 dark:border-gray-600 pl-2">
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 border-l-2 border-gray-200 pl-2">
             {params.map(([key, value]) => (
-                <div key={key} className="text-xs text-gray-600 dark:text-gray-400 flex items-center">
+                <div key={key} className="text-xs text-gray-600 flex items-center">
                     <span className="font-semibold capitalize">{key.replace(/_/g, ' ')}:</span>
-                    <code className="ml-1.5 text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded font-mono text-gray-800 dark:text-gray-200">{Array.isArray(value) ? value.join(', ') : String(value)}</code>
+                    <code className="ml-1.5 text-xs bg-gray-200 px-1.5 py-0.5 rounded font-mono text-gray-800">{Array.isArray(value) ? value.join(', ') : String(value)}</code>
                 </div>
             ))}
         </div>
@@ -173,7 +187,7 @@ const AnalysisPlanPanel: React.FC<AnalysisPlanPanelProps> = ({ plan, refinedInst
 
     if (plan.length === 0 && !refinedInstruction) {
         return (
-            <div className="text-center text-gray-500 dark:text-gray-400">
+            <div className="text-center text-gray-500">
                 <p>AIが生成した分析計画が表示されます。</p>
             </div>
         );
@@ -182,14 +196,14 @@ const AnalysisPlanPanel: React.FC<AnalysisPlanPanelProps> = ({ plan, refinedInst
     return (
         <div>
             {refinedInstruction && (
-                <div className="mb-6 p-4 bg-blue-50 dark:bg-gray-700/50 border border-blue-200 dark:border-gray-600 rounded-lg">
-                    <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">詳細化された指示</h3>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{refinedInstruction}</p>
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 className="text-sm font-semibold text-blue-800 mb-2">Analysis Plan</h3>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{refinedInstruction}</p>
                 </div>
             )}
             
             {plan.length > 0 && (
-                <ol className="relative border-l border-gray-200 dark:border-gray-700">
+                <ol className="relative border-l border-gray-200 pl-2">
                     {plan.map((step) => {
                         const isExpanded = openStepIds.has(step.id);
                         const isReviewStep = step.toolCall.name === 'conduct_final_review';
@@ -206,23 +220,23 @@ const AnalysisPlanPanel: React.FC<AnalysisPlanPanelProps> = ({ plan, refinedInst
                         
                         return (
                             <li key={step.id} className="mb-2 ml-6">
-                                <span className="absolute flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full -left-4 ring-4 ring-white dark:ring-gray-800 dark:bg-gray-700">
+                                <span className="absolute flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full -left-4 ring-4 ring-white">
                                     <StatusIcon status={step.status} />
                                 </span>
                                 <button
                                     onClick={() => toggleStep(step.id)}
-                                    className="w-full text-left p-1.5 rounded-md flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                                    className="w-full text-left p-1.5 rounded-md flex justify-between items-center hover:bg-gray-100 transition-colors"
                                     aria-expanded={isExpanded}
                                 >
-                                    <h4 className="font-semibold text-gray-800 dark:text-gray-200 flex items-center">
+                                    <h4 className="font-semibold text-gray-800 flex items-center">
                                         {`ステップ ${step.step}: ${stepName}`}
                                     </h4>
                                     {isExpanded ? <ChevronUpIcon className="w-4 h-4 text-gray-500 flex-shrink-0" /> : <ChevronDownIcon className="w-4 h-4 text-gray-500 flex-shrink-0" />}
                                 </button>
 
                                 {isExpanded && (
-                                    <div className="mt-2 pl-3 py-2 border-l-2 border-gray-200 dark:border-gray-600 ml-2 space-y-2">
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">{step.description}</p>
+                                    <div className="mt-2 pl-3 py-2 border-l-2 border-gray-200 ml-2 space-y-2">
+                                        <p className="text-sm text-gray-600">{step.description}</p>
                                         
                                         {step.resultDataset && (
                                             <div className="mt-2">
@@ -235,9 +249,9 @@ const AnalysisPlanPanel: React.FC<AnalysisPlanPanelProps> = ({ plan, refinedInst
                                             <p className="text-xs text-red-500 mt-1">エラー: {step.error}</p>
                                         )}
                                          {isReviewStep && step.status === 'warning' && step.result?.feedback && (
-                                            <div className="mt-2 p-2 rounded-md bg-yellow-50 dark:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-800">
-                                                <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-200">レビュー指摘:</p>
-                                                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">{step.result.feedback}</p>
+                                            <div className="mt-2 p-2 rounded-md bg-yellow-50 border border-yellow-200">
+                                                <p className="text-xs font-semibold text-yellow-800">レビュー指摘:</p>
+                                                <p className="text-xs text-yellow-700 mt-1">{step.result.feedback}</p>
                                             </div>
                                         )}
                                     </div>

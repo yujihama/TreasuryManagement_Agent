@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { marked } from 'marked';
@@ -9,6 +9,8 @@ import BarChartComponent from './BarChartComponent';
 import PieChartComponent from './PieChartComponent';
 import LineChartComponent from './LineChartComponent';
 import WorldMapComponent from './WorldMapComponent';
+import ScatterPlotComponent from './ScatterPlotComponent';
+import WaterfallChartComponent from './WaterfallChartComponent';
 import { SpinnerIcon } from '../icons';
 
 const ArtifactRenderer: React.FC<{ content: VisualContent }> = ({ content }) => {
@@ -17,7 +19,7 @@ const ArtifactRenderer: React.FC<{ content: VisualContent }> = ({ content }) => 
             {(() => {
                 switch (content.type) {
                     case 'table':
-                        return <TableComponent data={content.data} title={content.title} isCompact={false} />;
+                        return <TableComponent data={content.data} title={content.title} isCompact={false} noPagination={true} />;
                     case 'bar_chart':
                         return <BarChartComponent {...content} />;
                     case 'pie_chart':
@@ -26,6 +28,10 @@ const ArtifactRenderer: React.FC<{ content: VisualContent }> = ({ content }) => 
                         return <LineChartComponent {...content} />;
                     case 'world_map':
                         return <WorldMapComponent {...content} />;
+                    case 'scatter_plot':
+                        return <ScatterPlotComponent {...content} />;
+                    case 'waterfall_chart':
+                        return <WaterfallChartComponent {...content} />;
                     default:
                         return null;
                 }
@@ -54,8 +60,11 @@ const ReportComponent: React.FC<ReportContent> = ({ title, summary, artifacts })
                 scale: 2,
                 useCORS: true,
                 logging: false,
-                onclone: (document) => {
-                    document.documentElement.classList.remove('dark');
+                onclone: (clonedDoc) => {
+                    // Force table text to be dark for PDF generation to avoid issues with dark mode.
+                    clonedDoc.querySelectorAll('td, th').forEach((el) => {
+                        (el as HTMLElement).style.color = '#1f2937'; // tailwind gray-800
+                    });
                 },
             });
 
@@ -106,12 +115,96 @@ const ReportComponent: React.FC<ReportContent> = ({ title, summary, artifacts })
         }
     };
 
-    const sanitizedSummaryHtml = DOMPurify.sanitize(marked.parse(summary, { gfm: true, breaks: true }) as string);
+    const reportContent = useMemo(() => {
+        const blocks: React.ReactNode[] = [];
+        const artifactRegex = /<artifact_start>(.*?)<artifact_end>/g;
+        let lastIndex = 0;
+        let match;
+        let keyCounter = 0;
+
+        const artifactMap = new Map(artifacts.map(a => [a.title, a]));
+        const usedArtifactTitles = new Set<string>();
+
+        // Check if the summary contains any artifact placeholders
+        if (!artifactRegex.test(summary)) {
+            // Fallback to original behavior if no placeholders are found
+            const sanitizedSummaryHtml = DOMPurify.sanitize(marked.parse(summary, { gfm: true, breaks: true }) as string);
+            blocks.push(
+                <div 
+                    key="summary-full"
+                    className="markdown-content"
+                    dangerouslySetInnerHTML={{ __html: sanitizedSummaryHtml }}
+                />
+            );
+            artifacts.forEach((artifact, index) => {
+                blocks.push(
+                    <div key={`artifact-fallback-${index}`} className="page-break">
+                        <ArtifactRenderer content={artifact} />
+                    </div>
+                );
+            });
+            return blocks;
+        }
+
+        // Reset regex for exec loop
+        artifactRegex.lastIndex = 0;
+
+        while ((match = artifactRegex.exec(summary)) !== null) {
+            const textSegment = summary.substring(lastIndex, match.index);
+            if (textSegment.trim()) {
+                const sanitizedHtml = DOMPurify.sanitize(marked.parse(textSegment, { gfm: true, breaks: true }) as string);
+                blocks.push(
+                    <div 
+                        key={`text-${keyCounter++}`}
+                        className="markdown-content"
+                        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+                    />
+                );
+            }
+
+            const artifactTitle = match[1];
+            const artifact = artifactMap.get(artifactTitle);
+            if (artifact) {
+                blocks.push(
+                    <div key={`artifact-${keyCounter++}`} className="page-break">
+                        <ArtifactRenderer content={artifact} />
+                    </div>
+                );
+                usedArtifactTitles.add(artifactTitle);
+            }
+
+            lastIndex = match.index + match[0].length;
+        }
+
+        const remainingText = summary.substring(lastIndex);
+        if (remainingText.trim()) {
+            const sanitizedHtml = DOMPurify.sanitize(marked.parse(remainingText, { gfm: true, breaks: true }) as string);
+            blocks.push(
+                <div 
+                    key={`text-${keyCounter++}`}
+                    className="markdown-content"
+                    dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+                />
+            );
+        }
+
+        artifacts.forEach((artifact, index) => {
+            if (!usedArtifactTitles.has(artifact.title)) {
+                blocks.push(
+                    <div key={`artifact-unmentioned-${index}`} className="page-break">
+                        <ArtifactRenderer content={artifact} />
+                    </div>
+                );
+            }
+        });
+
+        return blocks;
+    }, [summary, artifacts]);
 
     return (
-        <div className="p-4 bg-gray-50 dark:bg-gray-900 report-container-scope">
+        <div className="p-4 bg-gray-50 report-container-scope">
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">レポート</h2>
+                <h2 className="text-2xl font-bold text-gray-900">レポート</h2>
                 <button
                     onClick={handleDownload}
                     disabled={isDownloading}
@@ -122,23 +215,15 @@ const ReportComponent: React.FC<ReportContent> = ({ title, summary, artifacts })
                 </button>
             </div>
             
-            <div ref={reportRef} className="report-content-wrapper bg-white">
+            <div ref={reportRef} className="report-content-wrapper bg-white text-gray-800">
                 <header className="mb-8 text-center">
                     <h1 className="text-4xl font-bold mb-2 text-gray-900">{title}</h1>
                     <p className="text-sm text-gray-500">Generated on: {new Date().toLocaleDateString()}</p>
                 </header>
                 <hr className="my-8 border-gray-200" />
-                <div 
-                    className="markdown-content mb-12 text-gray-800"
-                    dangerouslySetInnerHTML={{ __html: sanitizedSummaryHtml }}
-                />
                 
-                <div className="space-y-12">
-                    {artifacts.map((artifact, index) => (
-                        <div key={index} className="page-break">
-                            <ArtifactRenderer content={artifact} />
-                        </div>
-                    ))}
+                <div className="space-y-8">
+                    {reportContent}
                 </div>
             </div>
             <style>{`
@@ -164,6 +249,21 @@ const ReportComponent: React.FC<ReportContent> = ({ title, summary, artifacts })
                     margin-top: 2rem;
                     margin-bottom: 1rem;
                 }
+                /* Light mode table styles in markdown */
+                .report-container-scope .markdown-content table {
+                    color: #111827; /* gray-900 */
+                }
+                .report-container-scope .markdown-content th {
+                    background-color: #f9fafb !important; /* gray-50 */
+                }
+                .report-container-scope .markdown-content td {
+                    background-color: #ffffff !important; /* white */
+                }
+                .report-container-scope .markdown-content th,
+                .report-container-scope .markdown-content td {
+                     border-color: #e5e7eb !important; /* gray-200 */
+                }
+
                 .page-break {
                     page-break-before: always;
                 }

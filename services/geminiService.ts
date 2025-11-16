@@ -1,8 +1,9 @@
 
 import { FunctionDeclaration, Type, Part, Chat, GenerateContentResponse, GoogleGenAI } from '@google/genai';
-import type { DataSets, AnalysisStep, MessageContent, StrategistResponse, ClarificationState, VisualContent, ChatMessage, TextContent } from '../types';
-import type { ToolExecutor } from './toolExecutor';
+import type { DataSets, AnalysisStep, MessageContent, StrategistResponse, ClarificationState, VisualContent, ChatMessage, TextContent, ReportContent } from '../types';
+import type { ToolExecutor } from './toolExecutor.tsx';
 import { FINAL_REVIEWER_PROMPT, STRATEGIST_PROMPT } from '../constants';
+import logger from './loggingService';
 
 const toolSchemas: FunctionDeclaration[] = [
     {
@@ -32,7 +33,7 @@ const toolSchemas: FunctionDeclaration[] = [
     },
     {
         name: 'aggregate_data',
-        description: "Aggregate data by grouping and applying functions. The resulting aggregated column will be named '[aggregation_column]_[aggregation_function]', e.g., 'amount_sum'.",
+        description: "Aggregate data by grouping and applying functions. The resulting aggregated column will be named using underscores as '[aggregation_column]_[aggregation_function]' (e.g., 'amount_sum') and will not contain spaces.",
         parameters: {
             type: Type.OBJECT,
             properties: {
@@ -46,12 +47,12 @@ const toolSchemas: FunctionDeclaration[] = [
     },
      {
         name: 'add_column',
-        description: 'Add a new column to a dataset based on a simple arithmetic expression involving two columns or a column and a number (e.g., "column_a * column_b" or "column_a + 100"). Supported operators: +, -, *, /.',
+        description: "Add a new column to a dataset. This can be based on an arithmetic expression involving two columns or a column and a number (e.g., \"column_a * column_b\" or \"column_a + 100\" or \"-1*column_a\"). Supported operators: +, -, *, /. It can also be used to duplicate an existing column by providing just the column name as the expression (e.g., \"balance\"), or to create a column with a constant value by providing a number (e.g., \"0\") or a quoted string (e.g., \"'some_text'\"). Crucially, it supports using a scalar value from another single-row dataset in the expression, using the syntax 'column_a * [other_dataset].scalar_column'. It also supports conditional logic using a ternary operator with logical operators (&&, ||), e.g., \"column_a > 100 ? 'high' : 'low'\" or \"(column_a == 'AR' || column_a == 'AP') ? -1 * column_b : column_b\".",
         parameters: {
             type: Type.OBJECT,
             properties: {
                 dataset_name: { type: Type.STRING, description: 'Name of the dataset to modify.' },
-                new_column_name: { type: Type.STRING, description: 'The name of the new column to create.' },
+                new_column_name: { type: Type.STRING, description: 'The name of the new column to create. It must not contain spaces; use underscores instead (e.g., "impact_amount").' },
                 expression: { type: Type.STRING, description: 'The arithmetic expression to calculate the new column\'s value.' },
             },
             required: ['dataset_name', 'new_column_name', 'expression'],
@@ -71,7 +72,7 @@ const toolSchemas: FunctionDeclaration[] = [
     },
     {
         name: 'join_datasets',
-        description: 'Performs a join on two datasets based on a key column. Supports "inner", "left", "right", and "full" joins.',
+        description: 'Performs a join on two datasets based on a key column. If column names conflict (excluding the join key), the column from the right dataset will be renamed with a "_right" suffix (e.g., "amount_right"). Supports "inner", "left", "right", and "full" joins.',
         parameters: {
             type: Type.OBJECT,
             properties: {
@@ -85,8 +86,23 @@ const toolSchemas: FunctionDeclaration[] = [
         },
     },
     {
+        name: 'union_datasets',
+        description: 'Vertically concatenates rows from two or more datasets into a single dataset. All datasets must have identical column names and order.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                dataset_names: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: 'An array containing the names of at least two datasets to union.',
+                },
+            },
+            required: ['dataset_names'],
+        },
+    },
+    {
         name: 'forecast_time_series',
-        description: 'Forecast future values of a time series using linear regression.',
+        description: 'Forecast future values of a time series using linear regression. This tool adds new columns to the dataset: "forecast", "forecast_upper", and "forecast_lower".',
         parameters: {
             type: Type.OBJECT,
             properties: {
@@ -104,6 +120,19 @@ const toolSchemas: FunctionDeclaration[] = [
         },
     },
     {
+        name: 'calculate_correlated_forex_scenario',
+        description: '基準となる通貨ペアの仮想的な変動シナリオに基づき、関連性の高い他の通貨ペアの仮想レートを算出します。これはデモ用の簡易的な予測ツールです。',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                base_currency_pair: { type: Type.STRING, description: '基準となる通貨ペア (例: "USD/JPY")' },
+                scenario_rate: { type: Type.NUMBER, description: '基準通貨ペアのシナリオ（仮想）レート (例: 160.0)' },
+                periods: { type: Type.INTEGER, description: '生成する仮想レートの期間（日数）。デフォルトは30。' },
+            },
+            required: ['base_currency_pair', 'scenario_rate'],
+        },
+    },
+    {
         name: 'verify_visualization_data',
         description: 'Before generating a visualization, verify if the data is suitable (e.g., is it aggregated, does it have the right data types?). You MUST use this tool before calling any render_* tool.',
         parameters: {
@@ -113,17 +142,17 @@ const toolSchemas: FunctionDeclaration[] = [
                 visualization_type: {
                     type: Type.STRING,
                     description: 'The type of visualization planned.',
-                    enum: ['bar_chart', 'pie_chart', 'line_chart', 'world_map']
+                    enum: ['bar_chart', 'pie_chart', 'line_chart', 'world_map', 'scatter_plot', 'waterfall_chart']
                 },
                 columns: {
                     type: Type.OBJECT,
                     description: 'A mapping of visualization roles to column names. E.g., for a bar chart: {"category_column": "country", "value_column": "amount_sum"}',
                     properties: {
-                        category_column: { type: Type.STRING, description: "The column for the bar chart's X-axis (categories)." },
-                        value_column: { type: Type.STRING, description: 'The column for the value axis (e.g., bar height, pie slice size).' },
-                        name_column: { type: Type.STRING, description: "The column for the pie chart's slice names." },
-                        x_column: { type: Type.STRING, description: "The column for the line chart's X-axis." },
+                        category_column: { type: Type.STRING, description: "The column for categories/labels (X-axis for bar/waterfall, names for pie, etc.)." },
+                        value_column: { type: Type.STRING, description: 'The column for the primary numerical value (Y-axis for bar, slice size for pie, change for waterfall, etc.).' },
+                        x_column: { type: Type.STRING, description: "The column for the line chart's or scatter plot's X-axis." },
                         y_columns: { type: Type.ARRAY, items: { type: Type.STRING }, description: "The column(s) for the line chart's Y-axis." },
+                        y_column: { type: Type.STRING, description: "The column for the scatter plot's Y-axis." },
                         location_column: { type: Type.STRING, description: 'The column containing country codes (ISO 3166-1 alpha-3) for the world map.' },
                     },
                 },
@@ -133,7 +162,7 @@ const toolSchemas: FunctionDeclaration[] = [
     },
     {
         name: 'render_table',
-        description: 'Renders a table from a dataset to be included in visualizations or reports.',
+        description: 'Generates a Markdown-formatted string representation of a dataset. This is for embedding tables directly into report summaries. This tool does not create a visual artifact.',
         parameters: {
             type: Type.OBJECT,
             properties: {
@@ -164,11 +193,11 @@ const toolSchemas: FunctionDeclaration[] = [
             type: Type.OBJECT,
             properties: {
                 dataset_name: { type: Type.STRING, description: 'Name of the dataset to visualize.' },
-                name_column: { type: Type.STRING, description: 'The column for the slice names.' },
+                category_column: { type: Type.STRING, description: 'The column for the slice names.' },
                 value_column: { type: Type.STRING, description: 'The column for the slice values.' },
                 title: { type: Type.STRING, description: 'The title of the chart. It must be concise, descriptive, and ideally under 30 characters.' },
             },
-            required: ['dataset_name', 'name_column', 'value_column', 'title'],
+            required: ['dataset_name', 'category_column', 'value_column', 'title'],
         },
     },
     {
@@ -197,6 +226,34 @@ const toolSchemas: FunctionDeclaration[] = [
                 title: { type: Type.STRING, description: 'The title of the map. It must be concise, descriptive, and ideally under 30 characters.' },
             },
             required: ['dataset_name', 'location_column', 'value_column', 'title'],
+        },
+    },
+    {
+        name: 'render_scatter_plot',
+        description: 'Renders a scatter plot from a dataset. Useful for showing the relationship between two numerical variables.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                dataset_name: { type: Type.STRING, description: 'Name of the dataset to visualize.' },
+                x_column: { type: Type.STRING, description: 'The column for the X-axis (must be numerical).' },
+                y_column: { type: Type.STRING, description: 'The column for the Y-axis (must be numerical).' },
+                title: { type: Type.STRING, description: 'The title of the chart. It must be concise, descriptive, and ideally under 30 characters.' },
+            },
+            required: ['dataset_name', 'x_column', 'y_column', 'title'],
+        },
+    },
+    {
+        name: 'render_waterfall_chart',
+        description: 'Renders a waterfall chart to show the cumulative effect of sequentially introduced positive or negative values.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                dataset_name: { type: Type.STRING, description: 'Name of the dataset to visualize.' },
+                category_column: { type: Type.STRING, description: 'The column for the categories on the X-axis.' },
+                value_column: { type: Type.STRING, description: 'The column for the positive or negative values that contribute to the total.' },
+                title: { type: Type.STRING, description: 'The title of the chart. It must be concise, descriptive, and ideally under 30 characters.' },
+            },
+            required: ['dataset_name', 'category_column', 'value_column', 'title'],
         },
     },
     {
@@ -233,6 +290,10 @@ interface ReviewResult {
     decision: 'approve' | 'revise';
     feedback: string | null;
     revisedText: string | null;
+    revisedArtifacts?: {
+        title: string;
+        summary: string;
+    }[];
 }
 
 function translateErrorMessage(errorMessage: string): string {
@@ -286,6 +347,8 @@ async function callStrategist(ai: GoogleGenAI, userQuery: string, dataSets: Data
         .replace('{USER_QUERY}', userQuery)
         .replace('{CONVERSATION_HISTORY}', conversationHistory || 'なし');
 
+    logger.logStrategistPrompt(prompt);
+    
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
@@ -380,11 +443,24 @@ ${finalAnswerDraft}
 \`\`\`
 ---
 `;
+    const contents: Part[] = [{ text: prompt }];
+
+    const reportArtifact = artifacts.find(a => a.type === 'report' && (a as ReportContent).imageBase64) as ReportContent | undefined;
+    if (reportArtifact?.imageBase64) {
+        contents.push({
+            inlineData: {
+                mimeType: 'image/jpeg',
+                data: reportArtifact.imageBase64,
+            },
+        });
+    }
+
+    logger.logReviewerPrompt(prompt, summarizedArtifacts);
 
     try {
         const response = await ai.models.generateContent({
             model: model,
-            contents: prompt,
+            contents: contents,
             config: {
                 responseMimeType: 'application/json',
             }
@@ -423,6 +499,13 @@ export async function runChat(
 ): Promise<{ status: 'completed' | 'clarification_needed'; question?: string; context?: ClarificationState; }> {
     toolExecutor.loadData(dataSets);
 
+    const availableArtifacts = toolExecutor.getArtifacts();
+    let artifactListMessage = '';
+    if (availableArtifacts.length > 0) {
+        const artifactTitles = availableArtifacts.map(a => `"${a.title}"`).join(', ');
+        artifactListMessage = `\n\n利用可能な成果物は次のとおりです: [${artifactTitles}]。\`generate_report\`を呼び出す際は、これらの正確なタイトルを\`artifact_titles\`引数で使用しなければなりません。`;
+    }
+
     let currentMessage: string | Part[];
     let analysisInstructionForReviewer = '';
     let newArtifactGeneratedThisTurn = false;
@@ -436,8 +519,7 @@ export async function runChat(
             history: [...clarificationState.history, { role: 'user', text: message }]
         };
 
-        const strategistHistoryForContext = chatHistory.slice(0, -1); // Exclude the user's current message
-        const strategistResponse = await callStrategist(ai, message, dataSets, strategistHistoryForContext);
+        const strategistResponse = await callStrategist(ai, message, dataSets, chatHistory);
 
         if (!strategistResponse.is_clear) {
             const formattedQuestions = strategistResponse.questions_for_user.join('\n');
@@ -462,13 +544,14 @@ export async function runChat(
 
         const initialPlannerMessage = `The user's request is: "${activeClarificationState.originalQuery}".
 After a clarification conversation, the refined instruction for you is: "${analysisInstructionForReviewer}".
-Please create and execute a detailed, step-by-step plan based on this refined instruction.`;
+Please create and execute a detailed, step-by-step plan based on this refined instruction.${artifactListMessage}`;
         
+        logger.logPlannerInstruction(initialPlannerMessage);
         currentMessage = initialPlannerMessage;
 
     } else {
         // This is a new query or a follow-up instruction. Run the strategist.
-        const strategistResponse = await callStrategist(ai, message, dataSets, chatHistory.slice(0, -1));
+        const strategistResponse = await callStrategist(ai, message, dataSets, chatHistory);
 
         if (!strategistResponse.is_clear) {
             const formattedQuestions = strategistResponse.questions_for_user.join('\n');
@@ -490,8 +573,9 @@ Please create and execute a detailed, step-by-step plan based on this refined in
         callbacks.onRefinedInstruction?.(analysisInstructionForReviewer);
         callbacks.onAnalysisStart?.();
 
-        const initialPlannerMessage = `Based on the user's latest request ("${message}") and the conversation history, the refined instruction for you is: "${analysisInstructionForReviewer}". Please create and execute a step-by-step plan based on this refined instruction. If previous analysis steps have already produced necessary data, you may reuse it.`;
-
+        const initialPlannerMessage = `Based on the user's latest request ("${message}") and the conversation history, the refined instruction for you is: "${analysisInstructionForReviewer}". Please create and execute a step-by-step plan based on this refined instruction. If previous analysis steps have already produced necessary data, you may reuse it.${artifactListMessage}`;
+        
+        logger.logPlannerInstruction(initialPlannerMessage);
         currentMessage = initialPlannerMessage;
     }
 
@@ -499,6 +583,8 @@ Please create and execute a detailed, step-by-step plan based on this refined in
     let fullPlan: AnalysisStep[] = [...existingPlan];
     let hasError = false;
     let emptyResponseCount = 0;
+    let invalidResponseCount = 0;
+    const MAX_INVALID_RESPONSES = 2;
     const MAX_TURNS = 200;
     
     let consecutiveErrors = 0;
@@ -515,11 +601,10 @@ Please create and execute a detailed, step-by-step plan based on this refined in
             if (emptyResponseCount > 1) {
                 break;
             }
-            callbacks.onIntermediateMessage("AIの応答が空でした。結果を要約するように再試行します。");
+            callbacks.onIntermediateMessage("処理中...");
             currentMessage = "You have not provided a response or a tool call. Please review the work you have done in the previous steps and provide a final answer summarizing your findings to the user in Markdown format.";
             continue;
         }
-
         emptyResponseCount = 0;
         
         const runningRevisionStep = fullPlan.find(s => (s.toolCall.name === 'revise_plan_based_on_feedback' || s.toolCall.name === 'revise_plan_due_to_error') && s.status === 'running');
@@ -530,11 +615,13 @@ Please create and execute a detailed, step-by-step plan based on this refined in
         }
         
         if (responseText?.includes('[USER_INPUT_REQUIRED]')) {
+            invalidResponseCount = 0;
             callbacks.onFinalAnswer(responseText.trim());
             return { status: 'completed' };
         }
 
         if (functionCalls && functionCalls.length > 0) {
+            invalidResponseCount = 0;
             if (responseText) {
                 callbacks.onIntermediateMessage(responseText);
             }
@@ -592,7 +679,7 @@ Please create and execute a detailed, step-by-step plan based on this refined in
                         fullPlan.push(revisionStep);
                         callbacks.onPlanGenerated(fullPlan);
                         
-                        selfCorrectionPrompt = `The tool call '${step.toolCall.name}' failed with the error: "${errorMessage}". This is the first failure. Do not apologize. You must analyze this error and the previous steps. Then, generate a new plan to achieve the original goal ("${analysisInstructionForReviewer}"), avoiding this error. Proceed with the corrected plan.`;
+                        selfCorrectionPrompt = `The tool call '${step.toolCall.name}' failed with the error: "${errorMessage}". Do not apologize. Analyze the error and determine the best immediate next step to fix it. This could be re-running the tool with corrected parameters or using a different tool. State your correction concisely and then call the corrected tool. Do not generate a full new plan. Just proceed with the single next corrective step.${artifactListMessage}`;
                         break; 
                     }
                 }
@@ -601,6 +688,7 @@ Please create and execute a detailed, step-by-step plan based on this refined in
             if (hasError) { break; }
 
             if (selfCorrectionPrompt) {
+                logger.logPlannerInstruction(selfCorrectionPrompt);
                 currentMessage = selfCorrectionPrompt;
             } else {
                 currentMessage = toolExecutionParts;
@@ -609,48 +697,71 @@ Please create and execute a detailed, step-by-step plan based on this refined in
         }
         
         if (responseText) {
-            if (!newArtifactGeneratedThisTurn) {
-                callbacks.onFinalAnswer(responseText);
-                return { status: 'completed' };
-            }
-
-            const reviewStep: AnalysisStep = {
-                id: `as-${Date.now()}-review`,
-                step: fullPlan.length + 1,
-                description: 'AIの回答と成果物をレビュー中',
-                status: 'pending',
-                toolCall: { name: 'conduct_final_review', args: {} },
-            };
-            fullPlan.push(reviewStep);
-            callbacks.onPlanGenerated(fullPlan);
-            
-            callbacks.onStepUpdate({ ...reviewStep, status: 'reviewing' });
-            const reviewResult = await callFinalReviewer(ai, analysisInstructionForReviewer, fullPlan, responseText, toolExecutor.getArtifacts());
-            
-            if (reviewResult.decision === 'revise' && reviewResult.feedback) {
-                const warningStep: AnalysisStep = { ...reviewStep, status: 'warning', result: { feedback: reviewResult.feedback } };
-                callbacks.onStepUpdate(warningStep);
-                fullPlan = fullPlan.map(s => s.id === warningStep.id ? warningStep : s);
-
-                const revisionStep: AnalysisStep = {
-                    id: `as-${Date.now()}-revision`,
+            if (newArtifactGeneratedThisTurn) {
+                invalidResponseCount = 0;
+                const reviewStep: AnalysisStep = {
+                    id: `as-${Date.now()}-review`,
                     step: fullPlan.length + 1,
-                    description: 'レビュー指摘に基づいて計画を修正します。',
-                    status: 'running',
-                    toolCall: { name: 'revise_plan_based_on_feedback', args: {} },
+                    description: 'AIの回答と成果物をレビュー中',
+                    status: 'pending',
+                    toolCall: { name: 'conduct_final_review', args: {} },
                 };
-                fullPlan.push(revisionStep);
+                fullPlan.push(reviewStep);
                 callbacks.onPlanGenerated(fullPlan);
-                callbacks.onIntermediateMessage(`レビュー指摘: ${reviewResult.feedback}`);
-                currentMessage = `Your previous work was reviewed and requires correction. The previous steps of your plan are complete, but the final result was incorrect. Based on the following feedback, generate ONLY the additional steps needed to address the feedback and produce the correct final result. Do not repeat steps that have already been successfully completed. Review Feedback: "${reviewResult.feedback}"`;
-                continue;
+                
+                callbacks.onStepUpdate({ ...reviewStep, status: 'reviewing' });
+                const reviewResult = await callFinalReviewer(ai, analysisInstructionForReviewer, fullPlan, responseText, toolExecutor.getArtifacts());
+                
+                if (reviewResult.decision === 'revise' && reviewResult.feedback) {
+                    const warningStep: AnalysisStep = { ...reviewStep, status: 'warning', result: { feedback: reviewResult.feedback } };
+                    callbacks.onStepUpdate(warningStep);
+                    fullPlan = fullPlan.map(s => s.id === warningStep.id ? warningStep : s);
+
+                    const revisionStep: AnalysisStep = {
+                        id: `as-${Date.now()}-revision`,
+                        step: fullPlan.length + 1,
+                        description: 'レビュー指摘に基づいて計画を修正します。',
+                        status: 'running',
+                        toolCall: { name: 'revise_plan_based_on_feedback', args: {} },
+                    };
+                    fullPlan.push(revisionStep);
+                    callbacks.onPlanGenerated(fullPlan);
+                    callbacks.onIntermediateMessage(`レビュー指摘: ${reviewResult.feedback}`);
+                    currentMessage = `Your previous work was reviewed and requires correction. The previous steps of your plan are complete, but the final result was incorrect. Based on the following feedback, generate ONLY the additional steps needed to address the feedback and produce the correct final result. Do not repeat steps that have already been successfully completed. Review Feedback: "${reviewResult.feedback}"${artifactListMessage}`;
+                    logger.logPlannerInstruction(currentMessage as string);
+                    continue;
+                } else {
+                    if (reviewResult.revisedArtifacts && reviewResult.revisedArtifacts.length > 0) {
+                        callbacks.onIntermediateMessage("レビューAIがレポート内容を改善しました。");
+                        await toolExecutor.updateArtifacts(reviewResult.revisedArtifacts);
+                    }
+                    const completedStep: AnalysisStep = { ...reviewStep, status: 'completed', result: { message: '承認されました。' } };
+                    callbacks.onStepUpdate(completedStep);
+                    const reviewedArtifacts = toolExecutor.markAllArtifactsAsReviewed();
+                    callbacks.onReviewCompleted(reviewedArtifacts);
+                    callbacks.onFinalAnswer(reviewResult.revisedText || responseText);
+                    return { status: 'completed' };
+                }
             } else {
-                const completedStep: AnalysisStep = { ...reviewStep, status: 'completed', result: { message: '承認されました。' } };
-                callbacks.onStepUpdate(completedStep);
-                const reviewedArtifacts = toolExecutor.markAllArtifactsAsReviewed();
-                callbacks.onReviewCompleted(reviewedArtifacts);
-                callbacks.onFinalAnswer(reviewResult.revisedText || responseText);
-                return { status: 'completed' };
+                // No artifact generated. Check if it's a valid final answer.
+                const isShortOrGeneric = responseText.trim().length < 40 || /^(承知しました|わかりました|処理を続けます|はい|了解|続行します)/.test(responseText.trim());
+
+                if (isShortOrGeneric) {
+                    invalidResponseCount++;
+                    if (invalidResponseCount >= MAX_INVALID_RESPONSES) {
+                        const errorMessage = "AIが不適切な応答を繰り返したため、分析を停止しました。";
+                        callbacks.onFinalAnswer(errorMessage);
+                        return { status: 'completed' };
+                    }
+                    callbacks.onIntermediateMessage("AIの応答が不完全です。分析を続けるように再試行します。");
+                    currentMessage = "That was not a valid response. Your response was too short and not a valid final answer. According to your instructions, you must either call a tool, ask a clarifying question to the user, or provide a comprehensive final summary of the analysis. Please proceed with the next step of the plan by calling the next appropriate tool.";
+                    logger.logPlannerInstruction(currentMessage);
+                    continue;
+                } else {
+                    invalidResponseCount = 0;
+                    callbacks.onFinalAnswer(responseText);
+                    return { status: 'completed' };
+                }
             }
         }
     }

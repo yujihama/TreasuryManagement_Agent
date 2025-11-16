@@ -9,9 +9,11 @@ import AnalysisPlanPanel from './components/AnalysisPlanPanel';
 import DataViewer from './components/DataViewer';
 import VisualizationPanel from './components/VisualizationPanel';
 import { runChat, getToolSchemas } from './services/geminiService';
-import { ToolExecutor } from './services/toolExecutor';
+import { ToolExecutor } from './services/toolExecutor.tsx';
 import Resizer from './components/Resizer';
 import { RefreshIcon, SpinnerIcon } from './components/icons';
+import logger from './services/loggingService';
+import LogViewer from './components/LogViewer';
 
 // Assume API_KEY is set in the environment
 const API_KEY = process.env.API_KEY;
@@ -19,7 +21,7 @@ const API_KEY = process.env.API_KEY;
 declare const Papa: any;
 
 function isVisualContent(content: MessageContent): content is VisualContent {
-    return ['table', 'bar_chart', 'pie_chart', 'line_chart', 'world_map', 'report'].includes(content.type);
+    return ['table', 'bar_chart', 'pie_chart', 'line_chart', 'world_map', 'scatter_plot', 'waterfall_chart', 'report'].includes(content.type);
 }
 
 const MIN_PANEL_WIDTH = 280;
@@ -36,8 +38,8 @@ const App: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [clarificationState, setClarificationState] = useState<ClarificationState | null>(null);
     
-    const [leftPanelWidth, setLeftPanelWidth] = useState(384);
-    const [rightPanelWidth, setRightPanelWidth] = useState(0);
+    const [leftPanelWidth, setLeftPanelWidth] = useState(window.innerWidth * 0.30);
+    const [rightPanelWidth, setRightPanelWidth] = useState(window.innerWidth * 0.30);
 
     // FIX: Corrected typo from HTMLDivDivElement to HTMLDivElement.
     const appContainerRef = useRef<HTMLDivElement>(null);
@@ -98,12 +100,6 @@ const App: React.FC = () => {
         };
 
         loadInitialData();
-    }, []);
-
-    useEffect(() => {
-        if (appContainerRef.current) {
-            setRightPanelWidth(appContainerRef.current.offsetWidth * 0.4);
-        }
     }, []);
 
     const aiRef = useRef<GoogleGenAI | null>(null);
@@ -168,6 +164,7 @@ const App: React.FC = () => {
         setRefinedInstruction(null);
         chatRef.current = null;
         toolExecutorRef.current.reset();
+        logger.clear();
     }, []);
 
     const handleSendMessage = useCallback(async (message: string) => {
@@ -177,6 +174,8 @@ const App: React.FC = () => {
             setError("APIキーが設定されていません。API_KEY環境変数を設定してください。");
             return;
         }
+
+        logger.logChatMessage('user', message);
 
         const ai = aiRef.current;
         if (!ai) {
@@ -245,6 +244,7 @@ const App: React.FC = () => {
                     setArtifacts(reviewedArtifacts);
                 },
                 onIntermediateMessage: (interimMessage) => {
+                    logger.logChatMessage('model', interimMessage);
                     const message: ChatMessage = {
                         id: Date.now() + Math.random(),
                         role: 'model',
@@ -253,6 +253,7 @@ const App: React.FC = () => {
                     setChatHistory(prev => [...prev, message]);
                 },
                 onFinalAnswer: (answer) => {
+                    logger.logChatMessage('model', answer);
                     const finalMessage: ChatMessage = {
                         id: Date.now() + Math.random(),
                         role: 'model',
@@ -263,6 +264,7 @@ const App: React.FC = () => {
             }, analysisPlan, contextToUse, chatHistory);
 
             if (result.status === 'clarification_needed' && result.question && result.context) {
+                logger.logChatMessage('model', result.question);
                 const modelMessage: ChatMessage = {
                     id: Date.now(),
                     role: 'model',
@@ -294,48 +296,19 @@ const App: React.FC = () => {
 
     if (isDataLoading) {
         return (
-            <div className="flex h-screen items-center justify-center bg-gray-100 dark:bg-gray-900">
+            <div className="flex h-screen items-center justify-center bg-slate-100">
                 <SpinnerIcon className="w-12 h-12 animate-spin text-blue-500" />
-                <p className="ml-4 text-lg text-gray-700 dark:text-gray-300">サンプルデータを読み込んでいます...</p>
+                <p className="ml-4 text-lg text-slate-700">サンプルデータを読み込んでいます...</p>
             </div>
         );
     }
 
-    return (
-        <div ref={appContainerRef} className="flex h-screen font-sans text-gray-800 dark:text-gray-200 bg-gray-100 dark:bg-gray-900 overflow-hidden">
-            <div 
-                className="flex flex-col bg-white dark:bg-gray-800 flex-shrink-0"
-                style={{ width: `${leftPanelWidth}px` }}
-            >
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">Treasury Management Agent</h1>
-                    <button
-                        onClick={handleReset}
-                        className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
-                        title="分析をリセット"
-                    >
-                        <RefreshIcon className="w-5 h-5" />
-                    </button>
-                </div>
-                <div className="flex p-1 bg-gray-100 dark:bg-gray-900/50">
-                    <button onClick={() => setActiveTab('chat')} className={`flex-1 p-2 text-sm font-semibold rounded-md ${activeTab === 'chat' ? 'bg-white dark:bg-gray-700 shadow' : 'hover:bg-gray-200 dark:hover:bg-gray-700/50'}`}>
-                        Chat with Analysis Agent
-                    </button>
-                    <button onClick={() => setActiveTab('data')} className={`flex-1 p-2 text-sm font-semibold rounded-md ${activeTab === 'data' ? 'bg-white dark:bg-gray-700 shadow' : 'hover:bg-gray-200 dark:hover:bg-gray-700/50'}`}>
-                        Data Management
-                    </button>
-                </div>
-                <div className="flex-grow p-4 overflow-y-auto">
-                    <AnalysisPlanPanel plan={analysisPlan} refinedInstruction={refinedInstruction} />
-                </div>
-            </div>
-
-            <Resizer onMouseDown={handleMouseDown('left')} />
-
-            <main className="flex-1 flex flex-row overflow-hidden">
-                {activeTab === 'chat' ? (
-                   <>
-                        <div className="flex-grow flex flex-col h-full min-w-0">
+    const renderMainContent = () => {
+        switch (activeTab) {
+            case 'chat':
+                return (
+                    <>
+                        <div className="flex-grow flex flex-col h-full min-w-0 bg-slate-50">
                             <ChatPanel
                                 history={chatHistory}
                                 onSendMessage={handleSendMessage}
@@ -344,25 +317,78 @@ const App: React.FC = () => {
                                 analysisPlan={analysisPlan}
                             />
                         </div>
-                        
                         <Resizer onMouseDown={handleMouseDown('right')} />
-                        
                         <div 
-                            className="flex-shrink-0 h-full"
+                            className="flex-shrink-0 h-full bg-slate-50"
                             style={{ width: `${rightPanelWidth}px` }}
                         >
                              <VisualizationPanel artifacts={artifacts} />
                         </div>
                    </>
-                ) : (
-                    <div className="flex-grow flex flex-col h-full min-w-0 min-h-0">
+                );
+            case 'data':
+                return (
+                     <div className="flex-grow flex flex-col h-full min-w-0 min-h-0 bg-slate-50">
                         <DataViewer
                             dataSets={dataSets}
                             onDataUpload={handleDataUpload}
                         />
                     </div>
-                )}
-            </main>
+                );
+            case 'logs':
+                return (
+                    <div className="flex-grow flex flex-col h-full min-w-0 min-h-0 bg-slate-50">
+                        <LogViewer />
+                    </div>
+                );
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <div ref={appContainerRef} className="flex h-screen font-sans text-slate-800 bg-slate-50 overflow-hidden">
+            <div 
+                className="flex flex-col bg-slate-100 flex-shrink-0 border-r border-slate-200"
+                style={{ width: `${leftPanelWidth}px` }}
+            >
+                <div className="p-4 border-b border-slate-300 flex justify-between items-center bg-slate-200">
+                    <h1 className="text-xl font-bold text-slate-900">Treasury Management Agent</h1>
+                    <button
+                        onClick={handleReset}
+                        className="p-2 rounded-md hover:bg-slate-300 text-slate-500"
+                        title="分析をリセット"
+                    >
+                        <RefreshIcon className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="flex p-1 bg-slate-300 border-y border-slate-300">
+                    <button onClick={() => setActiveTab('chat')} className={`flex-1 p-2 text-sm rounded-md transition-colors ${activeTab === 'chat' ? 'bg-white shadow-sm text-blue-600 font-semibold' : 'text-slate-600 hover:bg-slate-200 font-medium'}`}>
+                        Chat with Analysis Agent
+                    </button>
+                    <button onClick={() => setActiveTab('data')} className={`flex-1 p-2 text-sm rounded-md transition-colors ${activeTab === 'data' ? 'bg-white shadow-sm text-blue-600 font-semibold' : 'text-slate-600 hover:bg-slate-200 font-medium'}`}>
+                        Data Management
+                    </button>
+                    <button onClick={() => setActiveTab('logs')} className={`flex-1 p-2 text-sm rounded-md transition-colors ${activeTab === 'logs' ? 'bg-white shadow-sm text-blue-600 font-semibold' : 'text-slate-600 hover:bg-slate-200 font-medium'}`}>
+                        Execution Logs
+                    </button>
+                </div>
+                <div className="flex-grow overflow-auto p-4">
+                    {activeTab === 'chat' ? (
+                        <AnalysisPlanPanel plan={analysisPlan} refinedInstruction={refinedInstruction} />
+                    ) : (
+                         <div className="p-4 text-sm text-slate-500 text-center pt-8">
+                             <p>分析計画は「Chat with Analysis Agent」タブを選択中に表示されます。</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <Resizer onMouseDown={handleMouseDown('left')} />
+            
+            <div className="flex-grow flex h-full min-w-0">
+                {renderMainContent()}
+            </div>
         </div>
     );
 };

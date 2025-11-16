@@ -1,6 +1,0 @@
-invoice_id,customer_id,country,branch_office,invoice_date,due_date,amount,currency,status
-INV-001,CUST-A,USA,New York HQ,2024-07-15,2024-08-14,50000,USD,outstanding
-INV-002,CUST-B,JPN,Tokyo Office,2024-07-20,2024-08-19,2000000,JPY,outstanding
-INV-003,CUST-C,DEU,Berlin Office,2024-06-30,2024-07-30,25000,EUR,paid
-INV-004,CUST-A,USA,New York HQ,2024-08-01,2024-08-31,75000,USD,outstanding
-INV-005,CUST-D,GBR,London Office,2024-08-05,2024-09-04,30000,GBP,outstanding

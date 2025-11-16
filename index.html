@@ -18,9 +18,6 @@
       border-radius: 0.25rem;
       font-size: 0.875em;
     }
-    .dark .markdown-content code {
-      background-color: rgba(255,255,255,0.1);
-    }
     .markdown-content p { margin-bottom: 0.5rem; }
     .markdown-content p:last-child { margin-bottom: 0; }
     .markdown-content h3 {
@@ -28,11 +25,8 @@
         font-weight: 600;
         margin-top: 1.5rem;
         margin-bottom: 1rem;
-        border-bottom: 1px solid #e5e7eb; /* gray-200 */
+        border-bottom: 1px solid #e2e8f0; /* slate-200 */
         padding-bottom: 0.5rem;
-    }
-    .dark .markdown-content h3 {
-        border-bottom-color: #374151; /* gray-700 */
     }
     .markdown-content h4 {
         font-size: 1.1rem;
@@ -47,31 +41,22 @@
         font-size: 0.875em;
     }
     .markdown-content th, .markdown-content td {
-        border: 1px solid #e5e7eb; /* gray-200 */
+        border: 1px solid #e2e8f0; /* slate-200 */
         padding: 0.5rem 0.75rem;
         text-align: left;
     }
     .markdown-content th {
-        background-color: #f9fafb; /* gray-50 */
+        background-color: #f8fafc; /* slate-50 */
         font-weight: 600;
-    }
-    .dark .markdown-content th, .dark .markdown-content td {
-        border-color: #374151; /* gray-700 */
-    }
-    .dark .markdown-content th {
-        background-color: #1f2937; /* gray-800 */
     }
     
     .typing-indicator span {
       height: 8px;
       width: 8px;
-      background-color: #9ca3af; /* gray-400 */
+      background-color: #94a3b8; /* slate-400 */
       border-radius: 50%;
       display: inline-block;
       animation: typing-wave 1.4s infinite ease-in-out both;
-    }
-    .dark .typing-indicator span {
-      background-color: #9ca3af; /* gray-400 */
     }
     .typing-indicator span:nth-of-type(1) {
       animation-delay: -0.32s;
@@ -107,7 +92,7 @@
 }
 </script>
 </head>
-  <body class="bg-gray-100 dark:bg-gray-900">
+  <body class="bg-slate-50">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

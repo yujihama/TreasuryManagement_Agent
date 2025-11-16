@@ -39,7 +39,7 @@ export interface PieChartContent {
     type: 'pie_chart';
     title: string;
     data: CsvRow[];
-    nameKey: string;
+    categoryKey: string;
     valueKey: string;
     isReviewed?: boolean;
 }
@@ -62,15 +62,34 @@ export interface WorldMapContent {
     isReviewed?: boolean;
 }
 
+export interface ScatterPlotContent {
+    type: 'scatter_plot';
+    title: string;
+    data: CsvRow[];
+    xKey: string;
+    yKey: string;
+    isReviewed?: boolean;
+}
+
+export interface WaterfallChartContent {
+    type: 'waterfall_chart';
+    title: string;
+    data: CsvRow[];
+    categoryKey: string;
+    valueKey: string;
+    isReviewed?: boolean;
+}
+
 export interface ReportContent {
     type: 'report';
     title: string;
     summary: string;
     artifacts: VisualContent[];
     isReviewed?: boolean;
+    imageBase64?: string;
 }
 
-export type VisualContent = TableContent | BarChartContent | PieChartContent | LineChartContent | WorldMapContent | ReportContent;
+export type VisualContent = TableContent | BarChartContent | PieChartContent | LineChartContent | WorldMapContent | ScatterPlotContent | WaterfallChartContent | ReportContent;
 
 export type MessageContent = TextContent | VisualContent;
 
@@ -97,7 +116,7 @@ export interface AnalysisStep {
         columns?: string[] | { name: string; type: string; }[];
         warning?: string;
         // From getDescriptiveStats
-        statistics?: Record<string, number | undefined>;
+        statistics?: Record<string, number | string | undefined>;
         // From aggregateData single result
         data?: CsvRow;
         // From get_dataset_schema

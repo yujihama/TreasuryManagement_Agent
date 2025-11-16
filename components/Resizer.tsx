@@ -10,7 +10,7 @@ const Resizer: React.FC<ResizerProps> = ({ onMouseDown, className = '' }) => {
     return (
         <div
             style={{ flexShrink: 0 }}
-            className={`w-1.5 cursor-col-resize bg-gray-200 dark:bg-gray-700 hover:bg-blue-500 active:bg-blue-600 transition-colors duration-200 ease-in-out ${className}`}
+            className={`w-1.5 cursor-col-resize bg-slate-300 hover:bg-blue-500 active:bg-blue-600 transition-colors duration-200 ease-in-out ${className}`}
             onMouseDown={onMouseDown}
         />
     );

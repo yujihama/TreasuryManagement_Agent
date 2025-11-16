@@ -1,5 +1,0 @@
-payable_id,supplier_id,country,branch_office,invoice_date,due_date,amount,currency,status
-PAY-001,SUP-X,USA,New York HQ,2024-07-25,2024-08-24,22000,USD,unpaid
-PAY-002,SUP-Y,JPN,Tokyo Office,2024-07-28,2024-08-27,1500000,JPY,unpaid
-PAY-003,SUP-Z,DEU,Berlin Office,2024-07-10,2024-08-09,18000,EUR,unpaid
-PAY-004,SUP-X,USA,New York HQ,2024-06-15,2024-07-15,15000,USD,paid

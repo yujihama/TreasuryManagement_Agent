@@ -96,7 +96,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ history, onSendMessage, isLoading
     }, [history]);
 
     return (
-        <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-800">
+        <div className="flex flex-col h-full bg-slate-50">
             <div className="flex-grow p-6 overflow-y-auto">
                 <div className="space-y-6">
                     {groupedHistory.map((groupOrMsg, groupIndex) => {
@@ -142,13 +142,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ history, onSendMessage, isLoading
 
                             return (
                                 <div key={groupId} className="flex items-start gap-4">
-                                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-                                        <BotIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                                    <div className="w-8 h-8 rounded-full bg-slate-300 flex items-center justify-center flex-shrink-0">
+                                        <BotIcon className="w-5 h-5 text-slate-700" />
                                     </div>
-                                    <div className="max-w-xl w-full rounded-lg overflow-hidden bg-white dark:bg-gray-900 shadow">
+                                    <div className="max-w-xl w-full rounded-lg overflow-hidden bg-slate-200 shadow">
                                         <button 
                                             onClick={() => toggleCollapse(groupId)} 
-                                            className="flex items-center justify-between w-full p-4 text-left font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50 disabled:cursor-default disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
+                                            className="flex items-center justify-between w-full p-4 text-left font-medium text-slate-900 hover:bg-slate-300/50 disabled:cursor-default disabled:hover:bg-transparent"
                                             aria-expanded={isExpanded}
                                             disabled={!hasPreviousMessages}
                                         >
@@ -163,15 +163,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ history, onSendMessage, isLoading
                                                 )}
                                             </span>
                                             {hasPreviousMessages && (
-                                                isExpanded ? <ChevronUpIcon className="w-5 h-5 text-gray-500" /> : <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                                                isExpanded ? <ChevronUpIcon className="w-5 h-5 text-slate-500" /> : <ChevronDownIcon className="w-5 h-5 text-slate-500" />
                                             )}
                                         </button>
                                         
-                                        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                                        <div className="p-4 border-t border-slate-300 bg-slate-50">
                                             {isExpanded && hasPreviousMessages && (
-                                                <div className="pb-4 mb-4 border-b border-gray-200 dark:border-gray-600 space-y-4">
+                                                <div className="pb-4 mb-4 border-b border-slate-300 space-y-4">
                                                     {previousMessages.map((msg, msgIndex) => (
-                                                        <div key={msg.id} className={msgIndex > 0 ? "pt-4 border-t border-gray-200 dark:border-gray-600" : ""}>
+                                                        <div key={msg.id} className={msgIndex > 0 ? "pt-4 border-t border-slate-300" : ""}>
                                                             {msg.content.map((content, contentIndex) => (
                                                                 <MessageContentRenderer key={contentIndex} content={content} />
                                                             ))}
@@ -214,8 +214,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ history, onSendMessage, isLoading
                 </div>
                 <div ref={messagesEndRef} />
             </div>
-            {error && <div className="px-6 py-2 text-sm text-red-500 bg-red-100 dark:bg-red-900/50">{error}</div>}
-            <div className="p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+            {error && <div className="px-6 py-2 text-sm text-red-500 bg-red-100">{error}</div>}
+            <div className="p-4 bg-slate-50 border-t border-slate-300">
                 <div className="relative">
                     <textarea
                         value={input}
@@ -227,7 +227,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ history, onSendMessage, isLoading
                             }
                         }}
                         placeholder="データについて質問してください..."
-                        className="w-full p-3 pr-20 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"
+                        className="w-full p-3 pr-20 rounded-lg border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"
                         rows={1}
                         disabled={isLoading}
                     />
