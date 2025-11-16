@@ -37,6 +37,7 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [clarificationState, setClarificationState] = useState<ClarificationState | null>(null);
+    const [recentDatasetNames, setRecentDatasetNames] = useState<string[]>([]);
     
     const [leftPanelWidth, setLeftPanelWidth] = useState(window.innerWidth * 0.30);
     const [rightPanelWidth, setRightPanelWidth] = useState(window.innerWidth * 0.30);
@@ -162,6 +163,7 @@ const App: React.FC = () => {
         setArtifacts([]);
         setClarificationState(null);
         setRefinedInstruction(null);
+        setRecentDatasetNames([]);
         chatRef.current = null;
         toolExecutorRef.current.reset();
         logger.clear();
@@ -228,6 +230,12 @@ const App: React.FC = () => {
                 onStepUpdate: (updatedStep) => {
                      setAnalysisPlan(prevPlan => prevPlan.map(s => s.id === updatedStep.id ? updatedStep : s));
                 },
+                onNewDatasetGenerated: (dataset) => {
+                    if (dataset?.name) {
+                        // Add to the beginning, keep unique, limit to 5
+                        setRecentDatasetNames(prev => [...new Set([dataset.name, ...prev])].slice(0, 5));
+                    }
+                },
                 onArtifactGenerated: (artifact) => {
                     setArtifacts(prev => [...prev, artifact]);
 
@@ -261,7 +269,7 @@ const App: React.FC = () => {
                     };
                     setChatHistory(prev => [...prev, finalMessage]);
                 }
-            }, analysisPlan, contextToUse, chatHistory);
+            }, analysisPlan, contextToUse, chatHistory, recentDatasetNames);
 
             if (result.status === 'clarification_needed' && result.question && result.context) {
                 logger.logChatMessage('model', result.question);
@@ -292,7 +300,7 @@ const App: React.FC = () => {
             setIsLoading(false);
         }
 
-    }, [isLoading, dataSets, analysisPlan, clarificationState, chatHistory, artifacts]);
+    }, [isLoading, dataSets, analysisPlan, clarificationState, chatHistory, artifacts, recentDatasetNames]);
 
     if (isDataLoading) {
         return (

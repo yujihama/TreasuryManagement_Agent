@@ -1,6 +1,6 @@
 
 import { FunctionDeclaration, Type, Part, Chat, GenerateContentResponse, GoogleGenAI } from '@google/genai';
-import type { DataSets, AnalysisStep, MessageContent, StrategistResponse, ClarificationState, VisualContent, ChatMessage, TextContent, ReportContent } from '../types';
+import type { DataSets, AnalysisStep, MessageContent, StrategistResponse, ClarificationState, VisualContent, ChatMessage, TextContent, ReportContent, DataSet } from '../types';
 import type { ToolExecutor } from './toolExecutor.tsx';
 import { FINAL_REVIEWER_PROMPT, STRATEGIST_PROMPT } from '../constants';
 import logger from './loggingService';
@@ -278,6 +278,7 @@ export function getToolSchemas(): FunctionDeclaration[] {
 interface RunChatCallbacks {
     onPlanGenerated: (plan: AnalysisStep[]) => void;
     onStepUpdate: (updatedStep: AnalysisStep) => void;
+    onNewDatasetGenerated: (dataset: DataSet | undefined) => void;
     onArtifactGenerated: (artifact: VisualContent) => void;
     onReviewCompleted: (reviewedArtifacts: VisualContent[]) => void;
     onIntermediateMessage: (message: string) => void;
@@ -495,16 +496,23 @@ export async function runChat(
     callbacks: RunChatCallbacks,
     existingPlan: AnalysisStep[],
     clarificationState: ClarificationState | null,
-    chatHistory: ChatMessage[]
+    chatHistory: ChatMessage[],
+    recentDatasetNames: string[]
 ): Promise<{ status: 'completed' | 'clarification_needed'; question?: string; context?: ClarificationState; }> {
     toolExecutor.loadData(dataSets);
 
     const availableArtifacts = toolExecutor.getArtifacts();
-    let artifactListMessage = '';
+    let contextualInfoMessage = '';
+
     if (availableArtifacts.length > 0) {
         const artifactTitles = availableArtifacts.map(a => `"${a.title}"`).join(', ');
-        artifactListMessage = `\n\n利用可能な成果物は次のとおりです: [${artifactTitles}]。\`generate_report\`を呼び出す際は、これらの正確なタイトルを\`artifact_titles\`引数で使用しなければなりません。`;
+        contextualInfoMessage += `\n\n利用可能な成果物は次のとおりです: [${artifactTitles}]。\`generate_report\`を呼び出す際は、これらの正確なタイトルを\`artifact_titles\`引数で使用しなければなりません。`;
     }
+    
+    if (recentDatasetNames && recentDatasetNames.length > 0) {
+        contextualInfoMessage += `\n\n参考情報: 直近で生成されたデータセット名は次のとおりです: [${recentDatasetNames.map(n => `"${n}"`).join(', ')}]。分析計画を作成する際は、これらの名前を優先的に使用してください。`;
+    }
+
 
     let currentMessage: string | Part[];
     let analysisInstructionForReviewer = '';
@@ -544,7 +552,7 @@ export async function runChat(
 
         const initialPlannerMessage = `The user's request is: "${activeClarificationState.originalQuery}".
 After a clarification conversation, the refined instruction for you is: "${analysisInstructionForReviewer}".
-Please create and execute a detailed, step-by-step plan based on this refined instruction.${artifactListMessage}`;
+Please create and execute a detailed, step-by-step plan based on this refined instruction.${contextualInfoMessage}`;
         
         logger.logPlannerInstruction(initialPlannerMessage);
         currentMessage = initialPlannerMessage;
@@ -573,7 +581,7 @@ Please create and execute a detailed, step-by-step plan based on this refined in
         callbacks.onRefinedInstruction?.(analysisInstructionForReviewer);
         callbacks.onAnalysisStart?.();
 
-        const initialPlannerMessage = `Based on the user's latest request ("${message}") and the conversation history, the refined instruction for you is: "${analysisInstructionForReviewer}". Please create and execute a step-by-step plan based on this refined instruction. If previous analysis steps have already produced necessary data, you may reuse it.${artifactListMessage}`;
+        const initialPlannerMessage = `Based on the user's latest request ("${message}") and the conversation history, the refined instruction for you is: "${analysisInstructionForReviewer}". Please create and execute a step-by-step plan based on this refined instruction. If previous analysis steps have already produced necessary data, you may reuse it.${contextualInfoMessage}`;
         
         logger.logPlannerInstruction(initialPlannerMessage);
         currentMessage = initialPlannerMessage;
@@ -644,6 +652,7 @@ Please create and execute a detailed, step-by-step plan based on this refined in
                 callbacks.onStepUpdate({ ...step, status: 'running' });
                 try {
                     const { result, artifact, newDataSet } = await toolExecutor.execute(step.toolCall);
+                    callbacks.onNewDatasetGenerated(newDataSet);
                     consecutiveErrors = 0; 
                     if (artifact) {
                         newArtifactGeneratedThisTurn = true;
@@ -679,7 +688,7 @@ Please create and execute a detailed, step-by-step plan based on this refined in
                         fullPlan.push(revisionStep);
                         callbacks.onPlanGenerated(fullPlan);
                         
-                        selfCorrectionPrompt = `The tool call '${step.toolCall.name}' failed with the error: "${errorMessage}". Do not apologize. Analyze the error and determine the best immediate next step to fix it. This could be re-running the tool with corrected parameters or using a different tool. State your correction concisely and then call the corrected tool. Do not generate a full new plan. Just proceed with the single next corrective step.${artifactListMessage}`;
+                        selfCorrectionPrompt = `The tool call '${step.toolCall.name}' failed with the error: "${errorMessage}". Do not apologize. Analyze the error and determine the best immediate next step to fix it. This could be re-running the tool with corrected parameters or using a different tool. State your correction concisely and then call the corrected tool. Do not generate a full new plan. Just proceed with the single next corrective step.${contextualInfoMessage}`;
                         break; 
                     }
                 }
@@ -727,7 +736,7 @@ Please create and execute a detailed, step-by-step plan based on this refined in
                     fullPlan.push(revisionStep);
                     callbacks.onPlanGenerated(fullPlan);
                     callbacks.onIntermediateMessage(`レビュー指摘: ${reviewResult.feedback}`);
-                    currentMessage = `Your previous work was reviewed and requires correction. The previous steps of your plan are complete, but the final result was incorrect. Based on the following feedback, generate ONLY the additional steps needed to address the feedback and produce the correct final result. Do not repeat steps that have already been successfully completed. Review Feedback: "${reviewResult.feedback}"${artifactListMessage}`;
+                    currentMessage = `Your previous work was reviewed and requires correction. The previous steps of your plan are complete, but the final result was incorrect. Based on the following feedback, generate ONLY the additional steps needed to address the feedback and produce the correct final result. Do not repeat steps that have already been successfully completed. Review Feedback: "${reviewResult.feedback}"${contextualInfoMessage}`;
                     logger.logPlannerInstruction(currentMessage as string);
                     continue;
                 } else {
